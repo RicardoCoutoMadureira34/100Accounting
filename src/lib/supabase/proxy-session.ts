@@ -40,7 +40,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && request.nextUrl.pathname === "/login") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL("/inicio", request.url));
   }
 
   return response;

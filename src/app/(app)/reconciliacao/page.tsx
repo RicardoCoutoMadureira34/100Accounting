@@ -8,7 +8,7 @@ function euro(n: number | null) {
   return n == null ? "—" : new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(n);
 }
 
-export default async function DashboardPage() {
+export default async function ReconciliacaoPage() {
   const supabase = await createClient();
 
   const { data: reconciliations } = await supabase

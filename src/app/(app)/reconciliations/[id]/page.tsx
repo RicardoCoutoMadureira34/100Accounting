@@ -33,7 +33,7 @@ export default async function ReconciliationResultsPage({
 
   return (
     <div>
-      <Link href="/dashboard" className="text-xs font-medium text-foreground/50 hover:text-foreground">
+      <Link href="/reconciliacao" className="text-xs font-medium text-foreground/50 hover:text-foreground">
         ← Conciliações
       </Link>
       <ResultsView

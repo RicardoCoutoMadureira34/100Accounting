@@ -168,7 +168,7 @@ export async function createReconciliation(_prev: ActionState, formData: FormDat
     })
     .eq("id", reconciliationId);
 
-  revalidatePath("/dashboard");
+  revalidatePath("/reconciliacao");
   redirect(`/reconciliations/${reconciliationId}`);
 }
 
@@ -206,5 +206,5 @@ export async function deleteReconciliation(reconciliationId: string) {
   }
 
   await supabase.from("reconciliations").delete().eq("id", reconciliationId);
-  revalidatePath("/dashboard");
+  revalidatePath("/reconciliacao");
 }

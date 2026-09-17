@@ -9,7 +9,7 @@ const initialState: AuthActionState = { error: null };
 export default function LoginForm() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") ?? "/dashboard";
+  const next = searchParams.get("next") ?? "/inicio";
 
   const [loginState, loginAction, loginPending] = useActionState(signIn, initialState);
   const [signupState, signupAction, signupPending] = useActionState(signUp, initialState);

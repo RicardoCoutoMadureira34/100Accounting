@@ -8,7 +8,7 @@ export type AuthActionState = { error: string | null };
 export async function signIn(_prev: AuthActionState, formData: FormData): Promise<AuthActionState> {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
-  const next = String(formData.get("next") ?? "/dashboard");
+  const next = String(formData.get("next") ?? "/inicio");
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -17,7 +17,7 @@ export async function signIn(_prev: AuthActionState, formData: FormData): Promis
     return { error: "Email ou palavra-passe incorretos." };
   }
 
-  redirect(next || "/dashboard");
+  redirect(next || "/inicio");
 }
 
 export async function signUp(_prev: AuthActionState, formData: FormData): Promise<AuthActionState> {
@@ -49,7 +49,7 @@ export async function signUp(_prev: AuthActionState, formData: FormData): Promis
     return { error: "Conta criada. Verifica o teu email para confirmar o registo antes de entrares." };
   }
 
-  redirect("/dashboard");
+  redirect("/inicio");
 }
 
 export async function signOut() {
