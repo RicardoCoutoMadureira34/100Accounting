@@ -1,220 +1,442 @@
-// Tipos alinhados manualmente com supabase/migrations/20260917140511_init_schema.sql.
-// Assim que o projeto Supabase estiver ligado, substituir por:
-//   npx supabase gen types typescript --linked > src/lib/supabase/database.types.ts
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
-export type ReconciliationStatus = "pending" | "processing" | "completed" | "failed";
-export type TransactionSource = "bank" | "accounting";
-export type MatchType = "exact" | "probable" | "unmatched_bank" | "unmatched_accounting";
-export type MatchStatus = "pending" | "confirmed" | "rejected";
-
-export interface Database {
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
-      profiles: {
-        Row: {
-          id: string;
-          full_name: string | null;
-          firm_name: string | null;
-          created_at: string;
-        };
-        Insert: {
-          id: string;
-          full_name?: string | null;
-          firm_name?: string | null;
-          created_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
-        Relationships: [];
-      };
-      clients: {
-        Row: {
-          id: string;
-          accountant_id: string;
-          name: string;
-          nif: string | null;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          accountant_id: string;
-          name: string;
-          nif?: string | null;
-          created_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["clients"]["Insert"]>;
-        Relationships: [
-          {
-            foreignKeyName: "clients_accountant_id_fkey";
-            columns: ["accountant_id"];
-            isOneToOne: false;
-            referencedRelation: "profiles";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
       bank_accounts: {
         Row: {
-          id: string;
-          client_id: string;
-          bank_name: string;
-          iban: string | null;
-          account_number: string | null;
-          created_at: string;
-        };
+          account_number: string | null
+          bank_name: string
+          client_id: string
+          created_at: string
+          iban: string | null
+          id: string
+        }
         Insert: {
-          id?: string;
-          client_id: string;
-          bank_name: string;
-          iban?: string | null;
-          account_number?: string | null;
-          created_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["bank_accounts"]["Insert"]>;
+          account_number?: string | null
+          bank_name: string
+          client_id: string
+          created_at?: string
+          iban?: string | null
+          id?: string
+        }
+        Update: {
+          account_number?: string | null
+          bank_name?: string
+          client_id?: string
+          created_at?: string
+          iban?: string | null
+          id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "bank_accounts_client_id_fkey";
-            columns: ["client_id"];
-            isOneToOne: false;
-            referencedRelation: "clients";
-            referencedColumns: ["id"];
+            foreignKeyName: "bank_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
-        ];
-      };
-      reconciliations: {
+        ]
+      }
+      clients: {
         Row: {
-          id: string;
-          bank_account_id: string;
-          period_start: string;
-          period_end: string;
-          status: ReconciliationStatus;
-          bank_statement_path: string | null;
-          accounting_statement_path: string | null;
-          bank_balance: number | null;
-          accounting_balance: number | null;
-          difference: number | null;
-          created_by: string;
-          created_at: string;
-          updated_at: string;
-        };
+          accountant_id: string
+          created_at: string
+          id: string
+          name: string
+          nif: string | null
+        }
         Insert: {
-          id?: string;
-          bank_account_id: string;
-          period_start: string;
-          period_end: string;
-          status?: ReconciliationStatus;
-          bank_statement_path?: string | null;
-          accounting_statement_path?: string | null;
-          bank_balance?: number | null;
-          accounting_balance?: number | null;
-          difference?: number | null;
-          created_by: string;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["reconciliations"]["Insert"]>;
+          accountant_id: string
+          created_at?: string
+          id?: string
+          name: string
+          nif?: string | null
+        }
+        Update: {
+          accountant_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          nif?: string | null
+        }
         Relationships: [
           {
-            foreignKeyName: "reconciliations_bank_account_id_fkey";
-            columns: ["bank_account_id"];
-            isOneToOne: false;
-            referencedRelation: "bank_accounts";
-            referencedColumns: ["id"];
+            foreignKeyName: "clients_accountant_id_fkey"
+            columns: ["accountant_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "reconciliations_created_by_fkey";
-            columns: ["created_by"];
-            isOneToOne: false;
-            referencedRelation: "profiles";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
-      transactions: {
-        Row: {
-          id: string;
-          reconciliation_id: string;
-          source: TransactionSource;
-          transaction_date: string;
-          description: string;
-          amount: number;
-          raw_data: Record<string, unknown> | null;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          reconciliation_id: string;
-          source: TransactionSource;
-          transaction_date: string;
-          description: string;
-          amount: number;
-          raw_data?: Record<string, unknown> | null;
-          created_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["transactions"]["Insert"]>;
-        Relationships: [
-          {
-            foreignKeyName: "transactions_reconciliation_id_fkey";
-            columns: ["reconciliation_id"];
-            isOneToOne: false;
-            referencedRelation: "reconciliations";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
+        ]
+      }
       matches: {
         Row: {
-          id: string;
-          reconciliation_id: string;
-          bank_transaction_id: string | null;
-          accounting_transaction_id: string | null;
-          match_type: MatchType;
-          confidence: number | null;
-          status: MatchStatus;
-          reviewed_by: string | null;
-          reviewed_at: string | null;
-          created_at: string;
-        };
+          accounting_transaction_id: string | null
+          bank_transaction_id: string | null
+          confidence: number | null
+          created_at: string
+          id: string
+          match_type: string
+          reconciliation_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
         Insert: {
-          id?: string;
-          reconciliation_id: string;
-          bank_transaction_id?: string | null;
-          accounting_transaction_id?: string | null;
-          match_type: MatchType;
-          confidence?: number | null;
-          status?: MatchStatus;
-          reviewed_by?: string | null;
-          reviewed_at?: string | null;
-          created_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["matches"]["Insert"]>;
+          accounting_transaction_id?: string | null
+          bank_transaction_id?: string | null
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          match_type: string
+          reconciliation_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          accounting_transaction_id?: string | null
+          bank_transaction_id?: string | null
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          match_type?: string
+          reconciliation_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "matches_reconciliation_id_fkey";
-            columns: ["reconciliation_id"];
-            isOneToOne: false;
-            referencedRelation: "reconciliations";
-            referencedColumns: ["id"];
+            foreignKeyName: "matches_accounting_transaction_id_fkey"
+            columns: ["accounting_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "matches_bank_transaction_id_fkey";
-            columns: ["bank_transaction_id"];
-            isOneToOne: false;
-            referencedRelation: "transactions";
-            referencedColumns: ["id"];
+            foreignKeyName: "matches_bank_transaction_id_fkey"
+            columns: ["bank_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "matches_accounting_transaction_id_fkey";
-            columns: ["accounting_transaction_id"];
-            isOneToOne: false;
-            referencedRelation: "transactions";
-            referencedColumns: ["id"];
+            foreignKeyName: "matches_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "reconciliations"
+            referencedColumns: ["id"]
           },
-        ];
-      };
-    };
-    Views: Record<string, never>;
-    Functions: Record<string, never>;
-    Enums: Record<string, never>;
-    CompositeTypes: Record<string, never>;
-  };
+          {
+            foreignKeyName: "matches_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          firm_name: string | null
+          full_name: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          firm_name?: string | null
+          full_name?: string | null
+          id: string
+        }
+        Update: {
+          created_at?: string
+          firm_name?: string | null
+          full_name?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      reconciliations: {
+        Row: {
+          accounting_balance: number | null
+          accounting_statement_path: string | null
+          bank_account_id: string
+          bank_balance: number | null
+          bank_statement_path: string | null
+          created_at: string
+          created_by: string
+          difference: number | null
+          id: string
+          period_end: string
+          period_start: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          accounting_balance?: number | null
+          accounting_statement_path?: string | null
+          bank_account_id: string
+          bank_balance?: number | null
+          bank_statement_path?: string | null
+          created_at?: string
+          created_by: string
+          difference?: number | null
+          id?: string
+          period_end: string
+          period_start: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          accounting_balance?: number | null
+          accounting_statement_path?: string | null
+          bank_account_id?: string
+          bank_balance?: number | null
+          bank_statement_path?: string | null
+          created_at?: string
+          created_by?: string
+          difference?: number | null
+          id?: string
+          period_end?: string
+          period_start?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reconciliations_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string
+          id: string
+          raw_data: Json | null
+          reconciliation_id: string
+          source: string
+          transaction_date: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description: string
+          id?: string
+          raw_data?: Json | null
+          reconciliation_id: string
+          source: string
+          transaction_date: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string
+          id?: string
+          raw_data?: Json | null
+          reconciliation_id?: string
+          source?: string
+          transaction_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "reconciliations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
 }
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never) = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never) = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
+  public: {
+    Enums: {},
+  },
+} as const

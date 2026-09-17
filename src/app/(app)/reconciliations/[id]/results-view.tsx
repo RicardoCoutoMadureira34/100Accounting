@@ -56,16 +56,20 @@ export default function ResultsView({
   const [tab, setTab] = useState<Tab>("reconciled");
   const [pending, startTransition] = useTransition();
   const [actioning, setActioning] = useState<string | null>(null);
+  // Cópia local editável: a Server Action persiste na base de dados, mas o
+  // ecrã tem de refletir a mudança de imediato sem esperar por uma navegação.
+  const [localMatches, setLocalMatches] = useState(matches);
 
-  const reconciled = matches.filter((m) => m.match_type === "exact" || (m.match_type === "probable" && m.status === "confirmed"));
-  const probable = matches.filter((m) => m.match_type === "probable" && m.status === "pending");
-  const bankOnly = matches.filter((m) => m.match_type === "unmatched_bank");
-  const acctOnly = matches.filter((m) => m.match_type === "unmatched_accounting");
+  const reconciled = localMatches.filter((m) => m.match_type === "exact" || (m.match_type === "probable" && m.status === "confirmed"));
+  const probable = localMatches.filter((m) => m.match_type === "probable" && m.status === "pending");
+  const bankOnly = localMatches.filter((m) => m.match_type === "unmatched_bank");
+  const acctOnly = localMatches.filter((m) => m.match_type === "unmatched_accounting");
 
   function act(matchId: string, next: "confirmed" | "rejected") {
     setActioning(matchId);
     startTransition(async () => {
       await updateMatchStatus(matchId, next, reconciliationId);
+      setLocalMatches((prev) => prev.map((m) => (m.id === matchId ? { ...m, status: next } : m)));
       setActioning(null);
     });
   }
@@ -99,7 +103,7 @@ export default function ResultsView({
     const probRows = [
       ["Data Banco", "Descrição Banco", "Valor Banco", "Data Contabilidade", "Descrição Contabilidade", "Valor Contabilidade", "Confiança (%)"],
     ];
-    matches
+    localMatches
       .filter((m) => m.match_type === "probable")
       .forEach((m) => {
         probRows.push([
