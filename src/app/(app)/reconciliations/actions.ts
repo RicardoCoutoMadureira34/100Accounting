@@ -118,7 +118,8 @@ export async function createReconciliation(_prev: ActionState, formData: FormDat
       bank_transaction_id: bankId,
       accounting_transaction_id: acctId,
       match_type: "probable",
-      confidence: round2(p.confidence),
+      // salvaguarda: normaliza caso o modelo devolva 0-1 em vez de 0-100
+      confidence: round2(p.confidence > 0 && p.confidence <= 1 ? p.confidence * 100 : p.confidence),
       note: p.reason,
       status: "pending",
     });

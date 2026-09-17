@@ -111,7 +111,7 @@ const ReportSchema = z.object({
       z.object({
         bank: TxSchema,
         accounting: TxSchema,
-        confidence: z.number().describe("0 a 100"),
+        confidence: z.number().describe("Pontuação de confiança em percentagem, um número inteiro de 0 a 100 (ex.: 92 — nunca uma fração como 0.92)"),
         reason: z.string().describe("Porque não há certeza absoluta ou qual a diferença encontrada (valor/data/descrição)"),
       })
     )
@@ -134,7 +134,10 @@ function client(): Anthropic {
 }
 
 export async function analyzeReconciliation(bankPdfBase64: string, accountingPdfBase64: string): Promise<ReconciliationReport> {
-  const response = await client().messages.parse({
+  // Streaming (em vez de .parse() não-streaming): com dois PDFs anexados e um
+  // max_tokens alto, o SDK recusa o pedido não-streaming por poder ultrapassar
+  // o tempo limite do HTTP — ver "128K output tokens" nas notas da API do Claude.
+  const stream = client().messages.stream({
     model: "claude-opus-5",
     max_tokens: 24000,
     system: SYSTEM_PROMPT,
@@ -153,6 +156,7 @@ export async function analyzeReconciliation(bankPdfBase64: string, accountingPdf
     output_config: { format: zodOutputFormat(ReportSchema) },
   });
 
+  const response = await stream.finalMessage();
   if (!response.parsed_output) {
     throw new Error("Não foi possível gerar a reconciliação.");
   }
