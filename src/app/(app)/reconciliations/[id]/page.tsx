@@ -14,7 +14,7 @@ export default async function ReconciliationResultsPage({
   const { data: reconciliation } = await supabase
     .from("reconciliations")
     .select(
-      "id, period_start, period_end, status, bank_balance, accounting_balance, difference, bank_accounts(bank_name, client_id, clients(name))"
+      "id, status, bank_balance, accounting_balance, difference, closes, summary, issues, next_steps, created_at"
     )
     .eq("id", id)
     .single();
@@ -24,34 +24,29 @@ export default async function ReconciliationResultsPage({
   const { data: matches } = await supabase
     .from("matches")
     .select(
-      `id, match_type, confidence, status,
+      `id, match_type, confidence, note, status,
        bank_transaction:transactions!matches_bank_transaction_id_fkey(id, transaction_date, description, amount),
        accounting_transaction:transactions!matches_accounting_transaction_id_fkey(id, transaction_date, description, amount)`
     )
     .eq("reconciliation_id", id)
     .order("created_at", { ascending: true });
 
-  const ba = reconciliation.bank_accounts as unknown as {
-    bank_name: string;
-    client_id: string;
-    clients: { name: string };
-  } | null;
-
   return (
     <div>
-      <Link href={ba ? `/clients/${ba.client_id}` : "/dashboard"} className="text-xs font-medium text-foreground/50 hover:text-foreground">
-        ← {ba?.clients?.name ?? "Cliente"}
+      <Link href="/dashboard" className="text-xs font-medium text-foreground/50 hover:text-foreground">
+        ← Conciliações
       </Link>
       <ResultsView
         reconciliationId={reconciliation.id}
-        clientName={ba?.clients?.name ?? "—"}
-        bankName={ba?.bank_name ?? "—"}
-        periodStart={reconciliation.period_start}
-        periodEnd={reconciliation.period_end}
+        createdAt={reconciliation.created_at}
         status={reconciliation.status}
         bankBalance={reconciliation.bank_balance}
         accountingBalance={reconciliation.accounting_balance}
         difference={reconciliation.difference}
+        closes={reconciliation.closes}
+        summary={reconciliation.summary}
+        issues={(reconciliation.issues as string[] | null) ?? []}
+        nextSteps={(reconciliation.next_steps as string[] | null) ?? []}
         matches={(matches ?? []) as unknown as MatchRow[]}
       />
     </div>

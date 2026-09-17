@@ -1,48 +1,15 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
-import { createReconciliation, type ActionState } from "../actions";
+import { createReconciliation, type ActionState } from "../reconciliations/actions";
 
 const initialState: ActionState = { error: null };
 
-function firstDayOfMonth(): string {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
-}
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-export default function NewReconciliationForm({ bankAccountId }: { bankAccountId: string }) {
+export default function NewReconciliationForm() {
   const [state, action, pending] = useActionState(createReconciliation, initialState);
 
   return (
-    <form action={action} className="mt-6 flex flex-col gap-5 rounded-xl border border-black/10 bg-white p-5 shadow-sm">
-      <input type="hidden" name="bank_account_id" value={bankAccountId} />
-
-      <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1.5 text-sm">
-          <span className="font-medium text-foreground/80">Início do período</span>
-          <input
-            type="date"
-            name="period_start"
-            required
-            defaultValue={firstDayOfMonth()}
-            className="rounded-lg border border-black/15 px-3 py-2 text-sm outline-none focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-          />
-        </label>
-        <label className="flex flex-col gap-1.5 text-sm">
-          <span className="font-medium text-foreground/80">Fim do período</span>
-          <input
-            type="date"
-            name="period_end"
-            required
-            defaultValue={today()}
-            className="rounded-lg border border-black/15 px-3 py-2 text-sm outline-none focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-          />
-        </label>
-      </div>
-
+    <form action={action} className="flex flex-col gap-5 rounded-xl border border-black/10 bg-white p-5 shadow-sm">
       <div className="grid gap-4 sm:grid-cols-2">
         <Dropzone name="bank_file" label="Extrato Bancário (PDF)" />
         <Dropzone name="accounting_file" label="Extrato da Contabilidade (PDF)" />

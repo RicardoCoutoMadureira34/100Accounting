@@ -3,8 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { extractStatementTransactions } from "@/lib/reconciliation/extract-pdf";
-import { matchStatements, type ExtractedTx } from "@/lib/reconciliation/match";
+import { analyzeReconciliation } from "@/lib/reconciliation/analyze";
 import type { Database } from "@/lib/supabase/database.types";
 
 type TransactionInsert = Database["public"]["Tables"]["transactions"]["Insert"];
@@ -17,15 +16,9 @@ function round2(n: number): number {
 }
 
 export async function createReconciliation(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const bankAccountId = String(formData.get("bank_account_id") ?? "");
-  const periodStart = String(formData.get("period_start") ?? "");
-  const periodEnd = String(formData.get("period_end") ?? "");
   const bankFile = formData.get("bank_file") as File | null;
   const accountingFile = formData.get("accounting_file") as File | null;
 
-  if (!bankAccountId || !periodStart || !periodEnd) {
-    return { error: "Preenche o período da conciliação." };
-  }
   if (!bankFile || bankFile.size === 0 || !accountingFile || accountingFile.size === 0) {
     return { error: "Carrega os dois ficheiros PDF." };
   }
@@ -52,9 +45,6 @@ export async function createReconciliation(_prev: ActionState, formData: FormDat
 
   const { error: insertError } = await supabase.from("reconciliations").insert({
     id: reconciliationId,
-    bank_account_id: bankAccountId,
-    period_start: periodStart,
-    period_end: periodEnd,
     status: "processing",
     bank_statement_path: bankPath,
     accounting_statement_path: accountingPath,
@@ -65,57 +55,100 @@ export async function createReconciliation(_prev: ActionState, formData: FormDat
     return { error: "Não foi possível criar a conciliação." };
   }
 
-  let bankStatement: { transactions: ExtractedTx[]; closingBalance: number | null };
-  let acctStatement: { transactions: ExtractedTx[]; closingBalance: number | null };
+  let report: Awaited<ReturnType<typeof analyzeReconciliation>>;
   try {
     const [bankBuf, acctBuf] = await Promise.all([bankFile.arrayBuffer(), accountingFile.arrayBuffer()]);
-    [bankStatement, acctStatement] = await Promise.all([
-      extractStatementTransactions(Buffer.from(bankBuf).toString("base64"), "bank"),
-      extractStatementTransactions(Buffer.from(acctBuf).toString("base64"), "accounting"),
-    ]);
+    report = await analyzeReconciliation(
+      Buffer.from(bankBuf).toString("base64"),
+      Buffer.from(acctBuf).toString("base64")
+    );
   } catch {
     await supabase.from("reconciliations").update({ status: "failed" }).eq("id", reconciliationId);
-    return { error: "Não foi possível ler um dos PDFs. Confirma que são extratos legíveis e tenta novamente." };
+    return { error: "Não foi possível analisar um dos PDFs. Confirma que são extratos legíveis e tenta novamente." };
   }
 
-  const bankTx = bankStatement.transactions;
-  const acctTx = acctStatement.transactions;
-  const matchResults = matchStatements(bankTx, acctTx);
+  if (!report.documentsReadable && report.reconciled.length === 0 && report.probableMatches.length === 0) {
+    await supabase
+      .from("reconciliations")
+      .update({ status: "failed", issues: report.issues })
+      .eq("id", reconciliationId);
+    return {
+      error:
+        report.issues[0] ??
+        "Não foi possível ler um dos documentos. Confirma que são extratos bancário/contabilístico legíveis.",
+    };
+  }
 
-  const bankTxIds = bankTx.map(() => crypto.randomUUID());
-  const acctTxIds = acctTx.map(() => crypto.randomUUID());
+  const transactions: TransactionInsert[] = [];
+  const matches: MatchInsert[] = [];
 
-  const transactions: TransactionInsert[] = [
-    ...bankTx.map((t, i) => ({
-      id: bankTxIds[i],
+  function txRow(source: "bank" | "accounting", t: { date: string; description: string; amount: number }): string {
+    const id = crypto.randomUUID();
+    transactions.push({
+      id,
       reconciliation_id: reconciliationId,
-      source: "bank" as const,
+      source,
       transaction_date: t.date,
       description: t.description,
       amount: round2(t.amount),
-    })),
-    ...acctTx.map((t, i) => ({
-      id: acctTxIds[i],
+    });
+    return id;
+  }
+
+  for (const t of report.reconciled) {
+    const bankId = txRow("bank", t);
+    const acctId = txRow("accounting", t);
+    matches.push({
+      id: crypto.randomUUID(),
       reconciliation_id: reconciliationId,
-      source: "accounting" as const,
-      transaction_date: t.date,
-      description: t.description,
-      amount: round2(t.amount),
-    })),
-  ];
+      bank_transaction_id: bankId,
+      accounting_transaction_id: acctId,
+      match_type: "exact",
+      confidence: 100,
+      status: "confirmed",
+    });
+  }
 
-  const matches: MatchInsert[] = matchResults.map((m) => ({
-    id: crypto.randomUUID(),
-    reconciliation_id: reconciliationId,
-    bank_transaction_id: m.bankIndex != null ? bankTxIds[m.bankIndex] : null,
-    accounting_transaction_id: m.accountingIndex != null ? acctTxIds[m.accountingIndex] : null,
-    match_type: m.matchType,
-    confidence: m.confidence,
-    status: m.matchType === "exact" ? "confirmed" : "pending",
-  }));
+  for (const p of report.probableMatches) {
+    const bankId = txRow("bank", p.bank);
+    const acctId = txRow("accounting", p.accounting);
+    matches.push({
+      id: crypto.randomUUID(),
+      reconciliation_id: reconciliationId,
+      bank_transaction_id: bankId,
+      accounting_transaction_id: acctId,
+      match_type: "probable",
+      confidence: round2(p.confidence),
+      note: p.reason,
+      status: "pending",
+    });
+  }
 
-  const bankBalance = round2(bankStatement.closingBalance ?? bankTx.reduce((sum, t) => sum + t.amount, 0));
-  const accountingBalance = round2(acctStatement.closingBalance ?? acctTx.reduce((sum, t) => sum + t.amount, 0));
+  for (const b of report.bankOnly) {
+    const bankId = txRow("bank", b);
+    matches.push({
+      id: crypto.randomUUID(),
+      reconciliation_id: reconciliationId,
+      bank_transaction_id: bankId,
+      accounting_transaction_id: null,
+      match_type: "unmatched_bank",
+      note: b.observation,
+      status: "pending",
+    });
+  }
+
+  for (const a of report.accountingOnly) {
+    const acctId = txRow("accounting", a);
+    matches.push({
+      id: crypto.randomUUID(),
+      reconciliation_id: reconciliationId,
+      bank_transaction_id: null,
+      accounting_transaction_id: acctId,
+      match_type: "unmatched_accounting",
+      note: a.observation,
+      status: "pending",
+    });
+  }
 
   const { error: txError } = transactions.length ? await supabase.from("transactions").insert(transactions) : { error: null };
   const { error: matchError } = txError || !matches.length ? { error: txError } : await supabase.from("matches").insert(matches);
@@ -124,9 +157,13 @@ export async function createReconciliation(_prev: ActionState, formData: FormDat
     .from("reconciliations")
     .update({
       status: txError || matchError ? "failed" : "completed",
-      bank_balance: bankBalance,
-      accounting_balance: accountingBalance,
-      difference: round2(bankBalance - accountingBalance),
+      bank_balance: report.bankBalance,
+      accounting_balance: report.accountingBalance,
+      difference: report.difference,
+      closes: report.closes,
+      summary: report.summary,
+      issues: report.issues,
+      next_steps: report.nextSteps,
     })
     .eq("id", reconciliationId);
 
@@ -147,4 +184,26 @@ export async function updateMatchStatus(matchId: string, status: "confirmed" | "
     .eq("id", matchId);
 
   revalidatePath(`/reconciliations/${reconciliationId}`);
+}
+
+export async function deleteReconciliation(reconciliationId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { data: recon } = await supabase
+    .from("reconciliations")
+    .select("bank_statement_path, accounting_statement_path")
+    .eq("id", reconciliationId)
+    .single();
+
+  if (recon) {
+    const paths = [recon.bank_statement_path, recon.accounting_statement_path].filter((p): p is string => !!p);
+    if (paths.length) await supabase.storage.from("statements").remove(paths);
+  }
+
+  await supabase.from("reconciliations").delete().eq("id", reconciliationId);
+  revalidatePath("/dashboard");
 }

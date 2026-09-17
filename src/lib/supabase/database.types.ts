@@ -39,73 +39,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      bank_accounts: {
-        Row: {
-          account_number: string | null
-          bank_name: string
-          client_id: string
-          created_at: string
-          iban: string | null
-          id: string
-        }
-        Insert: {
-          account_number?: string | null
-          bank_name: string
-          client_id: string
-          created_at?: string
-          iban?: string | null
-          id?: string
-        }
-        Update: {
-          account_number?: string | null
-          bank_name?: string
-          client_id?: string
-          created_at?: string
-          iban?: string | null
-          id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bank_accounts_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      clients: {
-        Row: {
-          accountant_id: string
-          created_at: string
-          id: string
-          name: string
-          nif: string | null
-        }
-        Insert: {
-          accountant_id: string
-          created_at?: string
-          id?: string
-          name: string
-          nif?: string | null
-        }
-        Update: {
-          accountant_id?: string
-          created_at?: string
-          id?: string
-          name?: string
-          nif?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "clients_accountant_id_fkey"
-            columns: ["accountant_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       matches: {
         Row: {
           accounting_transaction_id: string | null
@@ -114,6 +47,7 @@ export type Database = {
           created_at: string
           id: string
           match_type: string
+          note: string | null
           reconciliation_id: string
           reviewed_at: string | null
           reviewed_by: string | null
@@ -126,6 +60,7 @@ export type Database = {
           created_at?: string
           id?: string
           match_type: string
+          note?: string | null
           reconciliation_id: string
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -138,6 +73,7 @@ export type Database = {
           created_at?: string
           id?: string
           match_type?: string
+          note?: string | null
           reconciliation_id?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -199,56 +135,52 @@ export type Database = {
         Row: {
           accounting_balance: number | null
           accounting_statement_path: string | null
-          bank_account_id: string
           bank_balance: number | null
           bank_statement_path: string | null
+          closes: boolean | null
           created_at: string
           created_by: string
           difference: number | null
           id: string
-          period_end: string
-          period_start: string
+          issues: Json
+          next_steps: Json
           status: string
+          summary: string | null
           updated_at: string
         }
         Insert: {
           accounting_balance?: number | null
           accounting_statement_path?: string | null
-          bank_account_id: string
           bank_balance?: number | null
           bank_statement_path?: string | null
+          closes?: boolean | null
           created_at?: string
           created_by: string
           difference?: number | null
           id?: string
-          period_end: string
-          period_start: string
+          issues?: Json
+          next_steps?: Json
           status?: string
+          summary?: string | null
           updated_at?: string
         }
         Update: {
           accounting_balance?: number | null
           accounting_statement_path?: string | null
-          bank_account_id?: string
           bank_balance?: number | null
           bank_statement_path?: string | null
+          closes?: boolean | null
           created_at?: string
           created_by?: string
           difference?: number | null
           id?: string
-          period_end?: string
-          period_start?: string
+          issues?: Json
+          next_steps?: Json
           status?: string
+          summary?: string | null
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "reconciliations_bank_account_id_fkey"
-            columns: ["bank_account_id"]
-            isOneToOne: false
-            referencedRelation: "bank_accounts"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "reconciliations_created_by_fkey"
             columns: ["created_by"]
