@@ -58,8 +58,8 @@ export default function NewReconciliationForm({ bankAccountId }: { bankAccountId
         {pending ? "A carregar e a processar…" : "Iniciar Conciliação"}
       </button>
       <p className="text-xs text-foreground/45">
-        A leitura automática dos PDFs (OCR/IA) ainda não está ligada — esta versão guarda os ficheiros e gera um
-        conjunto de movimentos de teste para validar o resto do fluxo.
+        O Claude lê os dois PDFs e cruza os movimentos automaticamente — pode demorar até cerca de um minuto,
+        consoante o tamanho dos extratos.
       </p>
     </form>
   );

@@ -3,9 +3,18 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { generateStubDataset } from "@/lib/reconciliation/stub-seed";
+import { extractStatementTransactions } from "@/lib/reconciliation/extract-pdf";
+import { matchStatements, type ExtractedTx } from "@/lib/reconciliation/match";
+import type { Database } from "@/lib/supabase/database.types";
+
+type TransactionInsert = Database["public"]["Tables"]["transactions"]["Insert"];
+type MatchInsert = Database["public"]["Tables"]["matches"]["Insert"];
 
 export type ActionState = { error: string | null };
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
 
 export async function createReconciliation(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const bankAccountId = String(formData.get("bank_account_id") ?? "");
@@ -56,19 +65,68 @@ export async function createReconciliation(_prev: ActionState, formData: FormDat
     return { error: "Não foi possível criar a conciliação." };
   }
 
-  // TEMPORÁRIO: dados gerados, não extraídos dos PDFs — ver stub-seed.ts.
-  const dataset = generateStubDataset({ reconciliationId, periodStart, periodEnd });
+  let bankStatement: { transactions: ExtractedTx[]; closingBalance: number | null };
+  let acctStatement: { transactions: ExtractedTx[]; closingBalance: number | null };
+  try {
+    const [bankBuf, acctBuf] = await Promise.all([bankFile.arrayBuffer(), accountingFile.arrayBuffer()]);
+    [bankStatement, acctStatement] = await Promise.all([
+      extractStatementTransactions(Buffer.from(bankBuf).toString("base64"), "bank"),
+      extractStatementTransactions(Buffer.from(acctBuf).toString("base64"), "accounting"),
+    ]);
+  } catch {
+    await supabase.from("reconciliations").update({ status: "failed" }).eq("id", reconciliationId);
+    return { error: "Não foi possível ler um dos PDFs. Confirma que são extratos legíveis e tenta novamente." };
+  }
 
-  const { error: txError } = await supabase.from("transactions").insert(dataset.transactions);
-  const { error: matchError } = txError ? { error: txError } : await supabase.from("matches").insert(dataset.matches);
+  const bankTx = bankStatement.transactions;
+  const acctTx = acctStatement.transactions;
+  const matchResults = matchStatements(bankTx, acctTx);
+
+  const bankTxIds = bankTx.map(() => crypto.randomUUID());
+  const acctTxIds = acctTx.map(() => crypto.randomUUID());
+
+  const transactions: TransactionInsert[] = [
+    ...bankTx.map((t, i) => ({
+      id: bankTxIds[i],
+      reconciliation_id: reconciliationId,
+      source: "bank" as const,
+      transaction_date: t.date,
+      description: t.description,
+      amount: round2(t.amount),
+    })),
+    ...acctTx.map((t, i) => ({
+      id: acctTxIds[i],
+      reconciliation_id: reconciliationId,
+      source: "accounting" as const,
+      transaction_date: t.date,
+      description: t.description,
+      amount: round2(t.amount),
+    })),
+  ];
+
+  const matches: MatchInsert[] = matchResults.map((m) => ({
+    id: crypto.randomUUID(),
+    reconciliation_id: reconciliationId,
+    bank_transaction_id: m.bankIndex != null ? bankTxIds[m.bankIndex] : null,
+    accounting_transaction_id: m.accountingIndex != null ? acctTxIds[m.accountingIndex] : null,
+    match_type: m.matchType,
+    confidence: m.confidence,
+    status: m.matchType === "exact" ? "confirmed" : "pending",
+  }));
+
+  const bankBalance = round2(bankStatement.closingBalance ?? bankTx.reduce((sum, t) => sum + t.amount, 0));
+  const accountingBalance = round2(acctStatement.closingBalance ?? acctTx.reduce((sum, t) => sum + t.amount, 0));
+
+  const { error: txError } = transactions.length ? await supabase.from("transactions").insert(transactions) : { error: null };
+  const { error: matchError } = txError || !matches.length ? { error: txError } : await supabase.from("matches").insert(matches);
 
   await supabase
     .from("reconciliations")
     .update({
       status: txError || matchError ? "failed" : "completed",
-      bank_balance: dataset.bankBalance,
-      accounting_balance: dataset.accountingBalance,
-      difference: dataset.difference,
+      bank_balance: bankBalance,
+      accounting_balance: accountingBalance,
+      difference: round2(bankBalance - accountingBalance),
     })
     .eq("id", reconciliationId);
 
