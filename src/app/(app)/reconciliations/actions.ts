@@ -133,6 +133,7 @@ export async function createReconciliation(_prev: ActionState, formData: FormDat
       bank_transaction_id: bankId,
       accounting_transaction_id: null,
       match_type: "unmatched_bank",
+      category: b.category,
       note: b.observation,
       status: "pending",
     });
@@ -146,6 +147,7 @@ export async function createReconciliation(_prev: ActionState, formData: FormDat
       bank_transaction_id: null,
       accounting_transaction_id: acctId,
       match_type: "unmatched_accounting",
+      category: a.category,
       note: a.observation,
       status: "pending",
     });

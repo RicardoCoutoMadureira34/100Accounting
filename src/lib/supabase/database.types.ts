@@ -43,6 +43,7 @@ export type Database = {
         Row: {
           accounting_transaction_id: string | null
           bank_transaction_id: string | null
+          category: string | null
           confidence: number | null
           created_at: string
           id: string
@@ -56,6 +57,7 @@ export type Database = {
         Insert: {
           accounting_transaction_id?: string | null
           bank_transaction_id?: string | null
+          category?: string | null
           confidence?: number | null
           created_at?: string
           id?: string
@@ -69,6 +71,7 @@ export type Database = {
         Update: {
           accounting_transaction_id?: string | null
           bank_transaction_id?: string | null
+          category?: string | null
           confidence?: number | null
           created_at?: string
           id?: string

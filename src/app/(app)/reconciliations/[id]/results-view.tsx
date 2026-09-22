@@ -15,11 +15,28 @@ export interface MatchRow {
   id: string;
   match_type: "exact" | "probable" | "unmatched_bank" | "unmatched_accounting";
   confidence: number | null;
+  category: string | null;
   note: string | null;
   status: "pending" | "confirmed" | "rejected";
   bank_transaction: Tx | null;
   accounting_transaction: Tx | null;
 }
+
+// Categorias fixas devolvidas pelo Claude para movimentos sem correspondência
+// (ver UNMATCHED_CATEGORIES em src/lib/reconciliation/analyze.ts) — rótulos
+// para o ecrã e o Excel. "outra_sem_categoria" cobre matches antigos gravados
+// antes desta coluna existir (category === null).
+const CATEGORY_LABELS: Record<string, string> = {
+  cheque_em_transito: "Cheque em trânsito",
+  deposito_em_transito: "Depósito em trânsito",
+  debito_nao_registado: "Débito ainda não registado",
+  comissao_juro_bancario: "Comissão / juro bancário",
+  erro_transcricao: "Possível erro de transcrição",
+  duplicado: "Possível duplicado",
+  outro: "Outro",
+  outra_sem_categoria: "Sem categoria",
+};
+const categoryLabel = (c: string | null) => CATEGORY_LABELS[c ?? "outra_sem_categoria"] ?? CATEGORY_LABELS.outra_sem_categoria;
 
 const euro = (n: number | null) =>
   n == null ? "—" : new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(n);
@@ -68,6 +85,12 @@ export default function ResultsView({
   const bankOnly = localMatches.filter((m) => m.match_type === "unmatched_bank");
   const acctOnly = localMatches.filter((m) => m.match_type === "unmatched_accounting");
 
+  // Soma bruta dos valores sem correspondência de cada lado — distinta da
+  // "Diferença por explicar", que já vem líquida (um lado pode cancelar o
+  // outro). Isto mostra quanto dinheiro está mesmo pendente de revisão.
+  const bankOnlyTotal = bankOnly.reduce((s, m) => s + (m.bank_transaction?.amount ?? 0), 0);
+  const acctOnlyTotal = acctOnly.reduce((s, m) => s + (m.accounting_transaction?.amount ?? 0), 0);
+
   function act(matchId: string, next: "confirmed" | "rejected") {
     setActioning(matchId);
     startTransition(async () => {
@@ -94,8 +117,9 @@ export default function ResultsView({
       [],
       ["Reconciliados", reconciled.length],
       ["Prováveis — por confirmar", probable.length],
-      ["Só no Banco", bankOnly.length],
-      ["Só na Contabilidade", acctOnly.length],
+      ["Só no Banco", bankOnly.length, "Total (EUR)", bankOnlyTotal],
+      ["Só na Contabilidade", acctOnly.length, "Total (EUR)", acctOnlyTotal],
+      ["Valor sem correspondência (EUR)", Math.abs(bankOnlyTotal) + Math.abs(acctOnlyTotal)],
       [],
       ["Próximos passos"],
       ...nextSteps.map((s, i) => [`${i + 1}. ${s}`]),
@@ -128,16 +152,22 @@ export default function ResultsView({
       });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(probRows), "Provaveis");
 
-    const bankRows = [["Data", "Descrição", "Valor (EUR)", "Observação"]];
+    const bankRows = [["Data", "Descrição", "Valor (EUR)", "Categoria", "Observação"]];
     bankOnly.forEach((m) => {
-      if (m.bank_transaction) bankRows.push([dmy(m.bank_transaction.transaction_date), m.bank_transaction.description, String(m.bank_transaction.amount), m.note ?? ""]);
+      if (m.bank_transaction)
+        bankRows.push([dmy(m.bank_transaction.transaction_date), m.bank_transaction.description, String(m.bank_transaction.amount), categoryLabel(m.category), m.note ?? ""]);
     });
+    bankRows.push([]);
+    bankRows.push(["", "", "Total", String(bankOnlyTotal), ""]);
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bankRows), "So no Banco");
 
-    const acctRows = [["Data", "Descrição", "Valor (EUR)", "Observação"]];
+    const acctRows = [["Data", "Descrição", "Valor (EUR)", "Categoria", "Observação"]];
     acctOnly.forEach((m) => {
-      if (m.accounting_transaction) acctRows.push([dmy(m.accounting_transaction.transaction_date), m.accounting_transaction.description, String(m.accounting_transaction.amount), m.note ?? ""]);
+      if (m.accounting_transaction)
+        acctRows.push([dmy(m.accounting_transaction.transaction_date), m.accounting_transaction.description, String(m.accounting_transaction.amount), categoryLabel(m.category), m.note ?? ""]);
     });
+    acctRows.push([]);
+    acctRows.push(["", "", "Total", String(acctOnlyTotal), ""]);
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(acctRows), "So na Contabilidade");
 
     XLSX.writeFile(wb, `Concilia_${createdAt.slice(0, 10)}.xlsx`);
@@ -187,10 +217,15 @@ export default function ResultsView({
         </div>
       )}
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile label="Saldo do Banco" value={euro(bankBalance)} />
         <StatTile label="Saldo da Contabilidade" value={euro(accountingBalance)} />
         <StatTile label="Diferença por explicar" value={euro(difference)} danger />
+        <StatTile
+          label="Valor sem correspondência"
+          value={euro(Math.abs(bankOnlyTotal) + Math.abs(acctOnlyTotal))}
+          danger={bankOnly.length + acctOnly.length > 0}
+        />
       </div>
 
       <div className="mt-8 flex gap-1 border-b border-black/10 text-sm">
@@ -208,15 +243,15 @@ export default function ResultsView({
           />
         )}
         {tab === "bankonly" && (
-          <SimpleTable
-            rows={bankOnly.map((m) => ({ ...m.bank_transaction!, note: m.note })).filter((t) => t.id)}
-            badge={<span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">Sem correspondência</span>}
+          <GroupedUnmatchedTable
+            rows={bankOnly.map((m) => ({ ...m.bank_transaction!, note: m.note, category: m.category })).filter((t) => t.id)}
+            total={bankOnlyTotal}
           />
         )}
         {tab === "acctonly" && (
-          <SimpleTable
-            rows={acctOnly.map((m) => ({ ...m.accounting_transaction!, note: m.note })).filter((t) => t.id)}
-            badge={<span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">Sem correspondência</span>}
+          <GroupedUnmatchedTable
+            rows={acctOnly.map((m) => ({ ...m.accounting_transaction!, note: m.note, category: m.category })).filter((t) => t.id)}
+            total={acctOnlyTotal}
           />
         )}
         {tab === "probable" &&
@@ -352,6 +387,73 @@ function SimpleTable({ rows, badge }: { rows: (Tx & { note?: string | null })[];
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+type UnmatchedRow = Tx & { note: string | null; category: string | null };
+
+// Movimentos sem correspondência, agrupados pela categoria devolvida pelo
+// Claude (ver CATEGORY_LABELS acima), cada grupo com o seu subtotal — para o
+// contabilista perceber de imediato qual é a causa mais comum e quanto
+// dinheiro está em cada uma, além do total geral da secção.
+function GroupedUnmatchedTable({ rows, total }: { rows: UnmatchedRow[]; total: number }) {
+  const groups = useMemo(() => {
+    const byCategory = new Map<string, UnmatchedRow[]>();
+    for (const row of rows) {
+      const key = row.category ?? "outra_sem_categoria";
+      if (!byCategory.has(key)) byCategory.set(key, []);
+      byCategory.get(key)!.push(row);
+    }
+    return [...byCategory.entries()]
+      .map(([category, items]) => ({
+        category,
+        items: items.sort((a, b) => a.transaction_date.localeCompare(b.transaction_date)),
+        subtotal: items.reduce((s, t) => s + t.amount, 0),
+      }))
+      .sort((a, b) => Math.abs(b.subtotal) - Math.abs(a.subtotal));
+  }, [rows]);
+
+  if (rows.length === 0) {
+    return <p className="rounded-xl border border-black/10 bg-white px-6 py-10 text-center text-sm text-foreground/40">Sem movimentos nesta secção.</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm">
+        <span className="font-semibold text-amber-800">
+          {rows.length} {rows.length === 1 ? "movimento" : "movimentos"} sem correspondência
+        </span>
+        <span className="font-mono font-bold text-amber-800">Total: {euro(total)}</span>
+      </div>
+
+      {groups.map((g) => (
+        <div key={g.category} className="overflow-hidden rounded-xl border border-black/10 bg-white">
+          <div className="flex items-center justify-between bg-black/[0.02] px-4 py-2 text-xs">
+            <span className="font-bold uppercase tracking-wide text-foreground/60">
+              {categoryLabel(g.category)} <span className="font-normal normal-case text-foreground/40">({g.items.length})</span>
+            </span>
+            <span className="font-mono font-semibold text-foreground/70">{euro(g.subtotal)}</span>
+          </div>
+          <table className="w-full text-sm">
+            <tbody>
+              {g.items.map((t) => (
+                <tr key={t.id} className="border-t border-black/5 align-top hover:bg-black/[0.015]">
+                  <td className="whitespace-nowrap px-4 py-2.5 font-mono text-xs text-foreground/60">{dmy(t.transaction_date)}</td>
+                  <td className="px-4 py-2.5">
+                    {t.description}
+                    {t.note && <p className="mt-1 text-xs text-foreground/50">{t.note}</p>}
+                  </td>
+                  <td className={`px-4 py-2.5 text-right font-mono ${t.amount < 0 ? "text-foreground" : "text-accent-600"}`}>
+                    {t.amount > 0 ? "+" : ""}
+                    {euro(t.amount)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
     </div>
   );
 }

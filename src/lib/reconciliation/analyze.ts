@@ -69,7 +69,10 @@ numa folha de reconciliação — mas de forma automática, rigorosa e didática
      e não no extrato bancário.
    - Para cada um destes, sugere sempre a causa mais provável (ex.: "possível
      cheque ainda não compensado", "possível comissão bancária ainda não
-     contabilizada", "possível erro de digitação: 1.250,00 € vs 1.520,00 €").
+     contabilizada", "possível erro de digitação: 1.250,00 € vs 1.520,00 €")
+     E classifica-o também numa das categorias fixas do schema — a que
+     melhor descrever a causa mais provável; usa "outro" só quando nenhuma
+     das restantes categorias se aplicar.
    - Calcula o saldo reconciliado final e indica se bate certo com o saldo
      do extrato bancário e o saldo contabilístico (campo "closes").
 
@@ -103,6 +106,32 @@ campos para desenhar o ecrã de resultados e para a exportação para Excel.
 Mantém os dados de cada lista bem estruturados e consistentes (mesmo
 formato de data "YYYY-MM-DD", valores numéricos com sinal).`;
 
+// Categorias fechadas para movimentos sem correspondência — permitem
+// agrupar e subtotalizar "Só no Banco" / "Só na Contabilidade" no ecrã e no
+// Excel, além da explicação em texto livre ("observation") já existente.
+const UNMATCHED_CATEGORIES = [
+  "cheque_em_transito",
+  "deposito_em_transito",
+  "debito_nao_registado",
+  "comissao_juro_bancario",
+  "erro_transcricao",
+  "duplicado",
+  "outro",
+] as const;
+export type UnmatchedCategory = (typeof UNMATCHED_CATEGORIES)[number];
+
+const UnmatchedCategorySchema = z
+  .enum(UNMATCHED_CATEGORIES)
+  .describe(
+    "cheque_em_transito: cheque emitido mas ainda não compensado; " +
+      "deposito_em_transito: depósito/transferência a caminho mas ainda não visível no outro extrato; " +
+      "debito_nao_registado: débito direto ou pagamento que o banco já processou mas a contabilidade ainda não lançou; " +
+      "comissao_juro_bancario: comissão, imposto de selo ou juro bancário ainda não lançado na contabilidade; " +
+      "erro_transcricao: valor ou data foram registados de forma diferente nos dois documentos (provável erro de digitação); " +
+      "duplicado: o mesmo movimento parece estar lançado mais do que uma vez; " +
+      "outro: nenhuma das categorias anteriores se aplica"
+  );
+
 const TxSchema = z.object({
   // Formato reforçado (em vez de apenas z.string()): o zodOutputFormat
   // valida a resposta do modelo contra este schema e rejeita-a (lança erro)
@@ -134,10 +163,20 @@ const ReportSchema = z.object({
     )
     .describe("Pares que provavelmente correspondem ao mesmo movimento mas com alguma incerteza ou diferença de valor/data — 'Diferenças em movimentos correspondentes'"),
   bankOnly: z
-    .array(TxSchema.extend({ observation: z.string().describe("Hipótese explicativa mais provável para este movimento não ter correspondência") }))
+    .array(
+      TxSchema.extend({
+        category: UnmatchedCategorySchema,
+        observation: z.string().describe("Hipótese explicativa mais provável para este movimento não ter correspondência"),
+      })
+    )
     .describe("Movimentos que existem apenas no extrato bancário"),
   accountingOnly: z
-    .array(TxSchema.extend({ observation: z.string().describe("Hipótese explicativa mais provável para este movimento não ter correspondência") }))
+    .array(
+      TxSchema.extend({
+        category: UnmatchedCategorySchema,
+        observation: z.string().describe("Hipótese explicativa mais provável para este movimento não ter correspondência"),
+      })
+    )
     .describe("Movimentos que existem apenas na contabilidade"),
   nextSteps: z.array(z.string()).describe("Passos recomendados ao contabilista, por ordem de prioridade"),
 });
