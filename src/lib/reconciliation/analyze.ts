@@ -3,16 +3,12 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { extractText, getDocumentProxy } from "unpdf";
 
-// Escolha de modelo por chamada: o Haiku, em teste com extratos reais, deu
-// resultados de reconciliação inconsistentes entre execuções idênticas
-// sempre que um dos PDFs não tinha camada de texto (tinha de "ler" a imagem
-// da página) — não é fiável nesse cenário. Já com texto limpo dos dois
-// lados nunca testámos o Haiku, e é plausível que seja fiável (é uma tarefa
-// bem mais fácil para um modelo pequeno). Por isso: Haiku só quando os dois
-// PDFs extraem texto com sucesso; Sonnet 5 assim que algum cai em modo
-// imagem/documento — o cenário onde já sabemos que o Haiku falha.
-const MODEL_CHEAP = "claude-haiku-4-5-20251001";
-const MODEL_RELIABLE = "claude-sonnet-5";
+// Modelo usado nas chamadas de reconciliação. Trocar aqui para testar outro
+// modelo (ex.: "claude-opus-5", "claude-sonnet-5"). Decisão consciente de
+// usar só o Haiku: exige PDFs de texto dos clientes (não escaneados) para
+// ter uma leitura fiável — em teste com um PDF escaneado o Haiku deu
+// resultados de reconciliação inconsistentes entre execuções idênticas.
+const MODEL = "claude-haiku-4-5-20251001";
 
 // Abaixo deste número de carateres, o texto extraído do PDF é considerado
 // "vazio" (ex.: PDF escaneado sem camada de texto) e cai-se para o envio do
@@ -219,13 +215,12 @@ async function toDocumentInput(pdfBase64: string): Promise<DocumentInput> {
 
 export async function analyzeReconciliation(bankPdfBase64: string, accountingPdfBase64: string): Promise<ReconciliationReport> {
   const [bank, accounting] = await Promise.all([toDocumentInput(bankPdfBase64), toDocumentInput(accountingPdfBase64)]);
-  const model = bank.mode === "text" && accounting.mode === "text" ? MODEL_CHEAP : MODEL_RELIABLE;
 
   // Streaming (em vez de .parse() não-streaming): com um max_tokens alto,
   // o SDK recusa o pedido não-streaming por poder ultrapassar o tempo
   // limite do HTTP — ver "128K output tokens" nas notas da API do Claude.
   const stream = client().messages.stream({
-    model,
+    model: MODEL,
     max_tokens: 64000,
     system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
     messages: [
@@ -247,7 +242,7 @@ export async function analyzeReconciliation(bankPdfBase64: string, accountingPdf
 
   const usage = response.usage;
   console.log(
-    `[reconciliation] model=${model} bank_input=${bank.mode} accounting_input=${accounting.mode} ` +
+    `[reconciliation] model=${MODEL} bank_input=${bank.mode} accounting_input=${accounting.mode} ` +
       `input_tokens=${usage.input_tokens} output_tokens=${usage.output_tokens} ` +
       `cache_creation_input_tokens=${usage.cache_creation_input_tokens ?? 0} cache_read_input_tokens=${usage.cache_read_input_tokens ?? 0}`
   );
