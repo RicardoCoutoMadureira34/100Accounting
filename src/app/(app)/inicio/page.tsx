@@ -1,43 +1,48 @@
 import Link from "next/link";
+import { Reveal } from "./reveal";
 
 export default function InicioPage() {
   return (
     <div className="flex flex-col gap-16">
       {/* Hero */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-900 via-brand-700 to-brand-600 px-8 py-14 text-white shadow-lg sm:px-14 sm:py-16">
-        <div
-          className="pointer-events-none absolute -top-24 -right-24 h-80 w-80 rounded-full bg-accent-400/25 blur-3xl"
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute -bottom-32 left-1/3 h-72 w-72 rounded-full bg-amber-glow/10 blur-3xl"
-          aria-hidden
-        />
-        <div className="relative max-w-2xl">
-          <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white/80 ring-1 ring-white/20">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent-400" />
-            Para gabinetes de contabilidade
-          </p>
-          <h1 className="mt-5 font-display text-4xl font-extrabold leading-[1.08] sm:text-5xl">
-            A picagem manual do extrato bancário acabou.
-          </h1>
-          <p className="mt-5 text-lg leading-relaxed text-white/80">
-            Carrega o extrato do banco e o extrato da contabilidade em PDF. O Concilia lê os dois com IA, cruza os
-            movimentos e devolve-te, em minutos, um relatório claro do que bate, do que precisa de confirmação e do
-            que falta explicar — pronto a exportar para Excel.
-          </p>
-          <div className="mt-8 flex flex-wrap items-center gap-4">
-            <Link
-              href="/reconciliacao"
-              className="inline-flex items-center gap-2 rounded-xl bg-accent-500 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-accent-500/20 transition hover:bg-accent-400"
-            >
-              Nova conciliação
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                <path d="M5 12h14M13 6l6 6-6 6" />
-              </svg>
-            </Link>
-            <p className="text-sm text-white/60">Sem folhas de cálculo manuais. Sem cruzar movimento a movimento à mão.</p>
+      <section className="relative overflow-hidden rounded-3xl bg-ink-950 px-8 py-14 text-white shadow-lg sm:px-14 sm:py-20">
+        <div className="pointer-events-none absolute -top-24 -right-24 h-96 w-96 rounded-full bg-lime-400/20 blur-3xl" aria-hidden />
+        <div className="pointer-events-none absolute -bottom-32 left-1/4 h-72 w-72 rounded-full bg-lime-400/10 blur-3xl" aria-hidden />
+
+        <div className="relative grid items-center gap-12 lg:grid-cols-[1.1fr_1fr]">
+          <div className="max-w-xl">
+            <Reveal>
+              <h1 className="font-display text-4xl font-extrabold uppercase leading-[1.05] tracking-tight sm:text-5xl lg:text-[3.4rem]">
+                A picagem manual do extrato bancário{" "}
+                <span className="text-lime-400">acabou</span>.
+              </h1>
+            </Reveal>
+            <Reveal delay={120}>
+              <p className="mt-6 text-lg leading-relaxed text-white/70">
+                Carrega o extrato do banco e o extrato da contabilidade em PDF. O Concilia lê os dois com IA, cruza os
+                movimentos e devolve-te, em minutos, um relatório claro do que bate, do que precisa de confirmação e do
+                que falta explicar — pronto a exportar para Excel.
+              </p>
+            </Reveal>
+            <Reveal delay={240}>
+              <div className="mt-8 flex flex-wrap items-center gap-4">
+                <Link
+                  href="/reconciliacao"
+                  className="inline-flex items-center gap-2 rounded-xl bg-lime-400 px-6 py-3.5 text-sm font-bold text-ink-950 shadow-lg shadow-lime-400/20 transition hover:bg-lime-300"
+                >
+                  Nova conciliação
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <path d="M5 12h14M13 6l6 6-6 6" />
+                  </svg>
+                </Link>
+                <p className="text-sm text-white/50">Sem folhas de cálculo manuais. Sem cruzar movimento a movimento à mão.</p>
+              </div>
+            </Reveal>
           </div>
+
+          <Reveal delay={200} className="hidden lg:block">
+            <DashboardMockup />
+          </Reveal>
         </div>
       </section>
 
@@ -61,27 +66,39 @@ export default function InicioPage() {
       </section>
 
       {/* Como funciona */}
-      <section>
-        <div className="mb-6">
-          <p className="text-xs font-bold uppercase tracking-wide text-accent-600">Como funciona</p>
-          <h2 className="mt-1 text-2xl font-bold text-brand-700">Três passos, do PDF ao relatório</h2>
-        </div>
-        <div className="grid gap-5 sm:grid-cols-3">
-          <StepCard
-            n={1}
-            title="Carregar os dois PDFs"
-            text="Extrato bancário e extrato de conta corrente da contabilidade — arrasta os ficheiros ou escolhe-os do computador."
-          />
-          <StepCard
-            n={2}
-            title="Deixar o Concilia analisar"
-            text="O motor de IA lê ambos os documentos, normaliza os sinais de débito/crédito e cruza os movimentos automaticamente."
-          />
-          <StepCard
-            n={3}
-            title="Rever e exportar"
-            text="Confirma os pares prováveis, vê o que ficou por explicar de cada lado, e exporta o relatório completo para Excel."
-          />
+      <section className="relative overflow-hidden rounded-3xl bg-ink-950 px-8 py-14 sm:px-14 sm:py-16">
+        <div className="pointer-events-none absolute -top-20 right-1/4 h-72 w-72 rounded-full bg-lime-400/10 blur-3xl" aria-hidden />
+
+        <Reveal className="relative mb-9">
+          <h2 className="font-display text-3xl font-extrabold uppercase tracking-tight text-white sm:text-4xl">Como funciona</h2>
+          <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-lime-400">Três passos, do PDF ao relatório</p>
+        </Reveal>
+
+        <div className="relative grid gap-5 sm:grid-cols-3">
+          <Reveal delay={0}>
+            <StepCard
+              n={1}
+              icon={<UploadIcon />}
+              title="Importar dados bancários"
+              text="Carrega o extrato bancário e o extrato de conta corrente da contabilidade, os dois em PDF."
+            />
+          </Reveal>
+          <Reveal delay={120}>
+            <StepCard
+              n={2}
+              icon={<AiIcon />}
+              title="Conciliação com IA"
+              text="O motor de IA lê ambos os documentos, normaliza os sinais de débito/crédito e cruza os movimentos automaticamente."
+            />
+          </Reveal>
+          <Reveal delay={240}>
+            <StepCard
+              n={3}
+              icon={<ExcelIcon />}
+              title="Revisão e exportação"
+              text="Confirma os pares prováveis, vê o que ficou por explicar de cada lado, e exporta o relatório completo para Excel."
+            />
+          </Reveal>
         </div>
       </section>
 
@@ -115,11 +132,14 @@ function ValueCard({ icon, title, text }: { icon: React.ReactNode; title: string
   );
 }
 
-function StepCard({ n, title, text }: { n: number; title: string; text: string }) {
+function StepCard({ n, icon, title, text }: { n: number; icon: React.ReactNode; title: string; text: string }) {
   return (
-    <div className="relative rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
-      <span className="font-display text-3xl font-extrabold text-brand-50">{String(n).padStart(2, "0")}</span>
-      <h3 className="mt-2 text-sm font-bold text-foreground">{title}</h3>
+    <div className="relative rounded-2xl bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between">
+        <span className="font-display text-4xl font-extrabold text-lime-500">{String(n).padStart(2, "0")}</span>
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-ink-950/5 text-ink-950">{icon}</div>
+      </div>
+      <h3 className="mt-3 text-sm font-bold text-foreground">{title}</h3>
       <p className="mt-1.5 text-sm leading-relaxed text-foreground/60">{text}</p>
     </div>
   );
@@ -148,5 +168,76 @@ function SheetIcon() {
       <path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
       <path d="M14 3v5h5M9 13h6M9 17h6M9 9h1" />
     </svg>
+  );
+}
+
+function UploadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+      <path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+      <path d="M14 3v5h5" />
+      <path d="M12 18v-6M9.5 14.5 12 12l2.5 2.5" />
+    </svg>
+  );
+}
+function AiIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 3v2.5M12 18.5V21M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M3 12h2.5M18.5 12H21M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" />
+    </svg>
+  );
+}
+function ExcelIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+      <path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+      <path d="M14 3v5h5" />
+      <path d="m9 13 3 3 5-5" />
+    </svg>
+  );
+}
+
+// Ilustração decorativa (estática) do dashboard da app, para o hero — inspirada
+// no mockup fornecido: uma "janela" com barra de título e uma pré-visualização
+// simplificada do ecrã de nova conciliação.
+function DashboardMockup() {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white p-1.5 shadow-2xl shadow-black/40">
+      <div className="flex items-center gap-1.5 px-2.5 py-2">
+        <span className="h-2.5 w-2.5 rounded-full bg-danger-600/70" />
+        <span className="h-2.5 w-2.5 rounded-full bg-amber-glow/80" />
+        <span className="h-2.5 w-2.5 rounded-full bg-lime-500/80" />
+        <span className="ml-2 text-[11px] font-bold text-ink-950/60">Concilia · Dashboard</span>
+      </div>
+      <div className="rounded-xl bg-ink-950/[0.03] p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-xs font-bold text-ink-950/70">Nova Conciliação</p>
+          <span className="rounded-full bg-lime-400 px-2 py-0.5 text-[10px] font-bold text-ink-950">Nova Conciliação</span>
+        </div>
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-ink-950/10">
+          <div className="h-full w-2/3 rounded-full bg-lime-400" />
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="rounded-lg border border-dashed border-ink-950/15 bg-white p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-ink-950/40">Extrato Bancário</p>
+            <div className="mt-2 h-8 rounded-md bg-ink-950/[0.04]" />
+          </div>
+          <div className="rounded-lg border border-dashed border-ink-950/15 bg-white p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-ink-950/40">Extrato da Contabilidade</p>
+            <div className="mt-2 h-8 rounded-md bg-ink-950/[0.04]" />
+          </div>
+        </div>
+        <p className="mb-2 mt-4 text-[10px] font-bold uppercase tracking-wide text-ink-950/40">Conciliações Anteriores</p>
+        <div className="flex flex-col gap-2">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex items-center gap-2 rounded-md bg-white px-2.5 py-2 shadow-sm">
+              <div className="h-2 flex-1 rounded-full bg-ink-950/10" />
+              <span className="h-2 w-10 rounded-full bg-lime-400/80" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

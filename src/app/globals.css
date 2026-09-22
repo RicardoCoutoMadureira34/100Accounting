@@ -15,6 +15,14 @@
   --color-amber-glow: #f5b942;
   --color-danger-50: #fbe7e4;
   --color-danger-600: #c0392b;
+  /* Tema escuro + lima usado nas secções de destaque da página Início
+     (hero, "como funciona") — tokens à parte dos de "brand"/"accent" para
+     não alterar o resto da aplicação, que continua com o tema claro atual. */
+  --color-ink-950: #0a101d;
+  --color-ink-900: #10182b;
+  --color-lime-300: #d9f76e;
+  --color-lime-400: #b6ea34;
+  --color-lime-500: #9cd41c;
 }
 
 @theme inline {
@@ -32,6 +40,11 @@
   --color-amber-glow: var(--color-amber-glow);
   --color-danger-50: var(--color-danger-50);
   --color-danger-600: var(--color-danger-600);
+  --color-ink-950: var(--color-ink-950);
+  --color-ink-900: var(--color-ink-900);
+  --color-lime-300: var(--color-lime-300);
+  --color-lime-400: var(--color-lime-400);
+  --color-lime-500: var(--color-lime-500);
   --font-sans: var(--font-sans);
   --font-display: var(--font-display);
   --font-mono: var(--font-mono);
