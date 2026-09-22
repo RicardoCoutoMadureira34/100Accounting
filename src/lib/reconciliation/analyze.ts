@@ -1,6 +1,17 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
+import { extractText, getDocumentProxy } from "unpdf";
+
+// Modelo usado nas chamadas de reconciliação. Trocar aqui para testar outro
+// modelo (ex.: "claude-opus-5", "claude-sonnet-5"). Confirmado via
+// `GET /v1/models` como o Haiku mais recente disponível na conta.
+const MODEL = "claude-haiku-4-5-20251001";
+
+// Abaixo deste número de carateres, o texto extraído do PDF é considerado
+// "vazio" (ex.: PDF escaneado sem camada de texto) e cai-se para o envio do
+// PDF original como documento.
+const MIN_EXTRACTED_CHARS = 40;
 
 // Motor de reconciliação: o Claude lê os dois PDFs numa só chamada e faz a
 // leitura, o emparelhamento e o raciocínio de um contabilista sénior. O
@@ -133,22 +144,47 @@ function client(): Anthropic {
   return _client;
 }
 
+type DocumentInput = { block: Anthropic.Messages.ContentBlockParam; mode: "text" | "pdf" };
+
+// Tenta extrair o texto do PDF localmente (mais barato em tokens do que
+// enviar o PDF como documento, que a Claude processa também como imagem por
+// página). Se a extração falhar ou não vier texto (indício de PDF
+// escaneado), cai-se para o envio do PDF original como fallback.
+async function toDocumentInput(pdfBase64: string): Promise<DocumentInput> {
+  try {
+    const buffer = Buffer.from(pdfBase64, "base64");
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    const { text } = await extractText(pdf, { mergePages: true });
+    if (text.trim().length >= MIN_EXTRACTED_CHARS) {
+      return { block: { type: "text", text }, mode: "text" };
+    }
+  } catch {
+    // extração falhou — segue para o fallback de documento/imagem abaixo
+  }
+  return {
+    block: { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdfBase64 } },
+    mode: "pdf",
+  };
+}
+
 export async function analyzeReconciliation(bankPdfBase64: string, accountingPdfBase64: string): Promise<ReconciliationReport> {
-  // Streaming (em vez de .parse() não-streaming): com dois PDFs anexados e um
-  // max_tokens alto, o SDK recusa o pedido não-streaming por poder ultrapassar
-  // o tempo limite do HTTP — ver "128K output tokens" nas notas da API do Claude.
+  const [bank, accounting] = await Promise.all([toDocumentInput(bankPdfBase64), toDocumentInput(accountingPdfBase64)]);
+
+  // Streaming (em vez de .parse() não-streaming): com um max_tokens alto,
+  // o SDK recusa o pedido não-streaming por poder ultrapassar o tempo
+  // limite do HTTP — ver "128K output tokens" nas notas da API do Claude.
   const stream = client().messages.stream({
-    model: "claude-opus-5",
+    model: MODEL,
     max_tokens: 24000,
-    system: SYSTEM_PROMPT,
+    system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
     messages: [
       {
         role: "user",
         content: [
           { type: "text", text: "Documento 1 — Extrato Bancário:" },
-          { type: "document", source: { type: "base64", media_type: "application/pdf", data: bankPdfBase64 } },
+          bank.block,
           { type: "text", text: "Documento 2 — Extrato Contabilístico:" },
-          { type: "document", source: { type: "base64", media_type: "application/pdf", data: accountingPdfBase64 } },
+          accounting.block,
           { type: "text", text: "Faz a reconciliação bancária completa destes dois documentos, seguindo rigorosamente as tuas instruções." },
         ],
       },
@@ -157,6 +193,14 @@ export async function analyzeReconciliation(bankPdfBase64: string, accountingPdf
   });
 
   const response = await stream.finalMessage();
+
+  const usage = response.usage;
+  console.log(
+    `[reconciliation] model=${MODEL} bank_input=${bank.mode} accounting_input=${accounting.mode} ` +
+      `input_tokens=${usage.input_tokens} output_tokens=${usage.output_tokens} ` +
+      `cache_creation_input_tokens=${usage.cache_creation_input_tokens ?? 0} cache_read_input_tokens=${usage.cache_read_input_tokens ?? 0}`
+  );
+
   if (!response.parsed_output) {
     throw new Error("Não foi possível gerar a reconciliação.");
   }
