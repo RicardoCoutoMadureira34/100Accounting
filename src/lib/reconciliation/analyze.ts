@@ -104,7 +104,12 @@ Mantém os dados de cada lista bem estruturados e consistentes (mesmo
 formato de data "YYYY-MM-DD", valores numéricos com sinal).`;
 
 const TxSchema = z.object({
-  date: z.string().describe("Data no formato YYYY-MM-DD"),
+  // Formato reforçado (em vez de apenas z.string()): o zodOutputFormat
+  // valida a resposta do modelo contra este schema e rejeita-a (lança erro)
+  // se uma data não bater certo — falha aqui, de forma explícita, em vez de
+  // a gravação na base de dados (que insere tudo em bloco) rejeitar
+  // silenciosamente TODAS as transações por causa de uma única data má.
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe("Data no formato YYYY-MM-DD"),
   description: z.string(),
   amount: z.number().describe("Valor com sinal, perspetiva da conta bancária (negativo = saída, positivo = entrada)"),
 });
