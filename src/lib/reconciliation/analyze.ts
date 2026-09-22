@@ -4,9 +4,10 @@ import { z } from "zod";
 import { extractText, getDocumentProxy } from "unpdf";
 
 // Modelo usado nas chamadas de reconciliação. Trocar aqui para testar outro
-// modelo (ex.: "claude-opus-5", "claude-sonnet-5"). Confirmado via
-// `GET /v1/models` como o Haiku mais recente disponível na conta.
-const MODEL = "claude-haiku-4-5-20251001";
+// modelo (ex.: "claude-opus-5", "claude-haiku-4-5-20251001"). O Haiku é mais
+// barato mas, em teste com extratos reais, deu resultados de reconciliação
+// inconsistentes entre execuções idênticas — não é fiável para esta tarefa.
+const MODEL = "claude-sonnet-5";
 
 // Abaixo deste número de carateres, o texto extraído do PDF é considerado
 // "vazio" (ex.: PDF escaneado sem camada de texto) e cai-se para o envio do
@@ -175,7 +176,7 @@ export async function analyzeReconciliation(bankPdfBase64: string, accountingPdf
   // limite do HTTP — ver "128K output tokens" nas notas da API do Claude.
   const stream = client().messages.stream({
     model: MODEL,
-    max_tokens: 24000,
+    max_tokens: 64000,
     system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
     messages: [
       {
