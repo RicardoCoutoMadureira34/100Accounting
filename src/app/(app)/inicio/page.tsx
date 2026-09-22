@@ -17,7 +17,7 @@ export default function InicioPage() {
           <div className="max-w-xl">
             <Reveal>
               <h1 className="font-display text-4xl font-extrabold uppercase leading-[1.05] tracking-tight sm:text-5xl lg:text-[3.4rem]">
-                O <span className="text-lime-400">Match</span> acaba com o tempo perdido na reconciliação bancária.
+                O <span className="text-lime-400">Match</span> perfeito para a sua reconciliação bancária.
               </h1>
             </Reveal>
             <Reveal delay={120}>
