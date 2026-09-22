@@ -12,7 +12,7 @@ export default function LoginPage() {
             </svg>
           </span>
           <div>
-            <p className="font-semibold leading-tight text-brand-700">Concilia</p>
+            <p className="font-semibold leading-tight text-brand-700">Match</p>
             <p className="text-[11px] uppercase tracking-wide text-foreground/50">Conciliação bancária</p>
           </div>
         </div>

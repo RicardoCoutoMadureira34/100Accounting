@@ -22,7 +22,7 @@ export default async function ReconciliacaoPage() {
       <div>
         <h1 className="text-xl font-bold text-brand-700">Nova conciliação</h1>
         <p className="mt-1 text-sm text-foreground/60">
-          Carrega o extrato bancário e o extrato da contabilidade em PDF — o resto é automático.
+          Carrega o extrato bancário e o extrato da contabilidade em PDF. O resto é automático.
         </p>
         <div className="mt-4">
           <NewReconciliationForm />

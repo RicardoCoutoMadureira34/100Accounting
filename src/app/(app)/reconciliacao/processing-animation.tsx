@@ -32,7 +32,7 @@ export default function ProcessingAnimation() {
       </div>
       <h2 className="mt-5 text-base font-bold text-brand-700">A processar a conciliação</h2>
       <p className="mt-1 text-sm text-foreground/55">
-        O Concilia está a ler os dois extratos com IA — pode demorar até cerca de um minuto.
+        O Match está a ler os dois extratos, pode demorar até cerca de um minuto.
       </p>
 
       <div className="mt-6 h-1.5 w-full overflow-hidden rounded-full bg-black/5">

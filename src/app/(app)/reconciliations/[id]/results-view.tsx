@@ -116,7 +116,7 @@ export default function ResultsView({
       ["Reconciliação fecha?", closes ? "Sim" : "Não"],
       [],
       ["Reconciliados", reconciled.length],
-      ["Prováveis — por confirmar", probable.length],
+      ["Prováveis por confirmar", probable.length],
       ["Só no Banco", bankOnly.length, "Total (EUR)", bankOnlyTotal],
       ["Só na Contabilidade", acctOnly.length, "Total (EUR)", acctOnlyTotal],
       ["Valor sem correspondência (EUR)", Math.abs(bankOnlyTotal) + Math.abs(acctOnlyTotal)],
@@ -170,7 +170,7 @@ export default function ResultsView({
     acctRows.push(["", "", "Total", String(acctOnlyTotal), ""]);
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(acctRows), "So na Contabilidade");
 
-    XLSX.writeFile(wb, `Concilia_${createdAt.slice(0, 10)}.xlsx`);
+    XLSX.writeFile(wb, `Match_${createdAt.slice(0, 10)}.xlsx`);
   }
 
   return (
@@ -230,7 +230,7 @@ export default function ResultsView({
 
       <div className="mt-8 flex gap-1 border-b border-black/10 text-sm">
         <TabButton active={tab === "reconciled"} onClick={() => setTab("reconciled")} label="Reconciliado" count={reconciled.length} />
-        <TabButton active={tab === "probable"} onClick={() => setTab("probable")} label="Prováveis — confirmar" count={probable.length} />
+        <TabButton active={tab === "probable"} onClick={() => setTab("probable")} label="Prováveis a confirmar" count={probable.length} />
         <TabButton active={tab === "bankonly"} onClick={() => setTab("bankonly")} label="Só no Banco" count={bankOnly.length} />
         <TabButton active={tab === "acctonly"} onClick={() => setTab("acctonly")} label="Só na Contabilidade" count={acctOnly.length} />
       </div>

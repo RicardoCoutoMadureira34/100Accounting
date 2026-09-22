@@ -17,14 +17,13 @@ export default function InicioPage() {
           <div className="max-w-xl">
             <Reveal>
               <h1 className="font-display text-4xl font-extrabold uppercase leading-[1.05] tracking-tight sm:text-5xl lg:text-[3.4rem]">
-                A picagem manual do extrato bancário <span className="text-lime-400">acabou</span>.
+                O <span className="text-lime-400">Match</span> acaba com o tempo perdido na reconciliação bancária.
               </h1>
             </Reveal>
             <Reveal delay={120}>
               <p className="mt-6 text-lg leading-relaxed text-white/70">
-                Carrega o extrato do banco e o extrato da contabilidade em PDF. O Concilia lê os dois com IA, cruza os
-                movimentos e devolve-te, em minutos, um relatório claro do que bate, do que precisa de confirmação e do
-                que falta explicar — pronto a exportar para Excel.
+                Carrega o extrato do banco e o extrato da contabilidade em PDF. O Match lê os dois, cruza os movimentos e
+                devolve-te, em minutos, um relatório claro do que analisou.
               </p>
             </Reveal>
             <Reveal delay={240}>
@@ -38,7 +37,6 @@ export default function InicioPage() {
                     <path d="M5 12h14M13 6l6 6-6 6" />
                   </svg>
                 </Link>
-                <p className="text-sm text-white/50">Sem folhas de cálculo manuais. Sem cruzar movimento a movimento à mão.</p>
               </div>
             </Reveal>
           </div>
@@ -68,8 +66,8 @@ export default function InicioPage() {
               <StepCard
                 n={2}
                 icon={<AiIcon />}
-                title="Conciliação com IA"
-                text="O motor de IA lê ambos os documentos, normaliza os sinais de débito/crédito e cruza os movimentos automaticamente."
+                title="Cruzamento automático"
+                text="O Match lê ambos os documentos, normaliza os sinais de débito/crédito e cruza os movimentos automaticamente."
               />
             </Reveal>
             <Reveal delay={240}>
@@ -154,7 +152,7 @@ function DashboardMockup() {
         <span className="h-2.5 w-2.5 rounded-full bg-danger-600/70" />
         <span className="h-2.5 w-2.5 rounded-full bg-amber-glow/80" />
         <span className="h-2.5 w-2.5 rounded-full bg-lime-500/80" />
-        <span className="ml-2 text-[11px] font-bold text-ink-950/60">Concilia · Dashboard</span>
+        <span className="ml-2 text-[11px] font-bold text-ink-950/60">Match · Dashboard</span>
       </div>
       <div className="rounded-xl bg-ink-950/[0.03] p-4">
         <div className="mb-3 flex items-center justify-between">

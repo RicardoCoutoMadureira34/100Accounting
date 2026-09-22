@@ -20,8 +20,8 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Concilia — Reconciliação bancária automática",
-  description: "Carrega o extrato bancário e o extrato da contabilidade em PDF; o Concilia faz a reconciliação por ti.",
+  title: "Match · Reconciliação bancária automática",
+  description: "Carrega o extrato bancário e o extrato da contabilidade em PDF; o Match faz a reconciliação por ti.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

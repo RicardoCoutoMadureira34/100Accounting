@@ -36,7 +36,7 @@ export default function NewReconciliationForm() {
           Iniciar Conciliação
         </button>
         <p className="text-xs text-foreground/45">
-          O Claude lê os dois PDFs e cruza os movimentos automaticamente — cerca de um minuto.
+          O Match lê os dois PDFs e cruza os movimentos automaticamente, cerca de um minuto.
         </p>
       </div>
     </form>
