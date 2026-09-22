@@ -50,6 +50,13 @@
   --font-mono: var(--font-mono);
 }
 
+html {
+  /* A página Início usa um truque de "100vw" para o fundo escuro ocupar o
+     ecrã todo, fora do max-w-5xl partilhado — isto evita que esse cálculo
+     (100vw pode incluir a largura da scrollbar) cause scroll horizontal. */
+  overflow-x: hidden;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
