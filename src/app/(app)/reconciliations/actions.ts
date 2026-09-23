@@ -156,16 +156,42 @@ export async function createReconciliation(_prev: ActionState, formData: FormDat
   const { error: txError } = transactions.length ? await supabase.from("transactions").insert(transactions) : { error: null };
   const { error: matchError } = txError || !matches.length ? { error: txError } : await supabase.from("matches").insert(matches);
 
+  // A diferença "por explicar" mostrada ao utilizador tem de bater certo com
+  // os movimentos "só no banco" / "só na contabilidade" apresentados no ecrã.
+  // O saldo bancário e o saldo contabilístico que o modelo lê nos PDFs são
+  // calculados à parte do emparelhamento — por isso não usamos diretamente
+  // report.difference (bankBalance - accountingBalance), que pode ficar
+  // grande mesmo quando todos os movimentos já foram emparelhados (ex.: o
+  // modelo leu mal um dos saldos). Em vez disso, derivamos a diferença dos
+  // próprios movimentos identificados como não correspondidos, mais a
+  // discrepância de valor em correspondências prováveis.
+  const bankOnlySum = round2(report.bankOnly.reduce((s, b) => s + b.amount, 0));
+  const accountingOnlySum = round2(report.accountingOnly.reduce((s, a) => s + a.amount, 0));
+  const probableDelta = round2(report.probableMatches.reduce((s, p) => s + (p.bank.amount - p.accounting.amount), 0));
+  const explainedDifference = round2(bankOnlySum - accountingOnlySum + probableDelta);
+  const closes = Math.abs(explainedDifference) < 0.01;
+
+  const issues = [...report.issues];
+  if (
+    report.difference != null &&
+    Math.abs(report.difference - explainedDifference) > 0.01 &&
+    (report.bankOnly.length > 0 || report.accountingOnly.length > 0 || report.probableMatches.length > 0 || Math.abs(explainedDifference) > 0.01)
+  ) {
+    issues.push(
+      `Os saldos indicados nos extratos sugerem uma diferença de ${report.difference.toFixed(2)} €, mas os movimentos identificados como não correspondidos só explicam ${explainedDifference.toFixed(2)} €. Confirma se o saldo inicial e todos os movimentos de ambos os extratos foram lidos corretamente.`
+    );
+  }
+
   await supabase
     .from("reconciliations")
     .update({
       status: txError || matchError ? "failed" : "completed",
       bank_balance: report.bankBalance,
       accounting_balance: report.accountingBalance,
-      difference: report.difference,
-      closes: report.closes,
+      difference: explainedDifference,
+      closes,
       summary: report.summary,
-      issues: report.issues,
+      issues,
       next_steps: report.nextSteps,
     })
     .eq("id", reconciliationId);
