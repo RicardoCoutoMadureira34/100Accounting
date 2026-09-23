@@ -46,6 +46,7 @@ export type Database = {
           category: string | null
           confidence: number | null
           created_at: string
+          group_id: string | null
           id: string
           match_type: string
           note: string | null
@@ -60,6 +61,7 @@ export type Database = {
           category?: string | null
           confidence?: number | null
           created_at?: string
+          group_id?: string | null
           id?: string
           match_type: string
           note?: string | null
@@ -74,6 +76,7 @@ export type Database = {
           category?: string | null
           confidence?: number | null
           created_at?: string
+          group_id?: string | null
           id?: string
           match_type?: string
           note?: string | null
@@ -137,13 +140,16 @@ export type Database = {
       reconciliations: {
         Row: {
           accounting_balance: number | null
+          accounting_opening_balance: number | null
           accounting_statement_path: string | null
           bank_balance: number | null
+          bank_opening_balance: number | null
           bank_statement_path: string | null
           closes: boolean | null
           created_at: string
           created_by: string
           difference: number | null
+          extraction_verified: boolean | null
           id: string
           issues: Json
           next_steps: Json
@@ -153,13 +159,16 @@ export type Database = {
         }
         Insert: {
           accounting_balance?: number | null
+          accounting_opening_balance?: number | null
           accounting_statement_path?: string | null
           bank_balance?: number | null
+          bank_opening_balance?: number | null
           bank_statement_path?: string | null
           closes?: boolean | null
           created_at?: string
           created_by: string
           difference?: number | null
+          extraction_verified?: boolean | null
           id?: string
           issues?: Json
           next_steps?: Json
@@ -169,13 +178,16 @@ export type Database = {
         }
         Update: {
           accounting_balance?: number | null
+          accounting_opening_balance?: number | null
           accounting_statement_path?: string | null
           bank_balance?: number | null
+          bank_opening_balance?: number | null
           bank_statement_path?: string | null
           closes?: boolean | null
           created_at?: string
           created_by?: string
           difference?: number | null
+          extraction_verified?: boolean | null
           id?: string
           issues?: Json
           next_steps?: Json

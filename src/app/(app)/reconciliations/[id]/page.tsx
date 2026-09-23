@@ -24,7 +24,7 @@ export default async function ReconciliationResultsPage({
   const { data: matches } = await supabase
     .from("matches")
     .select(
-      `id, match_type, confidence, category, note, status,
+      `id, match_type, confidence, category, group_id, note, status,
        bank_transaction:transactions!matches_bank_transaction_id_fkey(id, transaction_date, description, amount),
        accounting_transaction:transactions!matches_accounting_transaction_id_fkey(id, transaction_date, description, amount)`
     )

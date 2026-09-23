@@ -4,6 +4,12 @@ import { StatusBadge } from "@/components/status-badge";
 import NewReconciliationForm from "./new-reconciliation-form";
 import DeleteReconciliationButton from "./delete-button";
 
+// A Server Action de nova conciliação faz várias chamadas ao modelo (duas
+// leituras em paralelo, eventual repetição e o texto do relatório): o limite
+// por omissão pode ser curto. Aplica-se às Server Actions usadas nesta página
+// (ver route segment config maxDuration na documentação do Next.js).
+export const maxDuration = 180;
+
 function euro(n: number | null) {
   return n == null ? "—" : new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(n);
 }

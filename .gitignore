@@ -44,3 +44,7 @@ next-env.d.ts
 # supabase
 supabase/.temp
 supabase/.branches
+
+# PDFs de clientes nunca entram no repositório
+/scripts/samples/
+*.pdf

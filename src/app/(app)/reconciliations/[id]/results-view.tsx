@@ -3,29 +3,14 @@
 import { useMemo, useState, useTransition } from "react";
 import { updateMatchStatus } from "../actions";
 import { StatusBadge } from "@/components/status-badge";
+import { deriveLists, type MatchRow, type Tx, type UnmatchedRow } from "@/lib/reconciliation/results";
 
-interface Tx {
-  id: string;
-  transaction_date: string;
-  description: string;
-  amount: number;
-}
+export type { MatchRow };
 
-export interface MatchRow {
-  id: string;
-  match_type: "exact" | "probable" | "unmatched_bank" | "unmatched_accounting";
-  confidence: number | null;
-  category: string | null;
-  note: string | null;
-  status: "pending" | "confirmed" | "rejected";
-  bank_transaction: Tx | null;
-  accounting_transaction: Tx | null;
-}
-
-// Categorias fixas devolvidas pelo Claude para movimentos sem correspondência
-// (ver UNMATCHED_CATEGORIES em src/lib/reconciliation/analyze.ts) — rótulos
+// Categorias fixas para movimentos sem correspondência (ver
+// UNMATCHED_CATEGORIES em src/lib/reconciliation/narrative.ts): rótulos
 // para o ecrã e o Excel. "outra_sem_categoria" cobre matches antigos gravados
-// antes desta coluna existir (category === null).
+// antes desta coluna existir e pares prováveis rejeitados (category === null).
 const CATEGORY_LABELS: Record<string, string> = {
   cheque_em_transito: "Cheque em trânsito",
   deposito_em_transito: "Depósito em trânsito",
@@ -80,22 +65,25 @@ export default function ResultsView({
   // ecrã tem de refletir a mudança de imediato sem esperar por uma navegação.
   const [localMatches, setLocalMatches] = useState(matches);
 
-  const reconciled = localMatches.filter((m) => m.match_type === "exact" || (m.match_type === "probable" && m.status === "confirmed"));
-  const probable = localMatches.filter((m) => m.match_type === "probable" && m.status === "pending");
-  const bankOnly = localMatches.filter((m) => m.match_type === "unmatched_bank");
-  const acctOnly = localMatches.filter((m) => m.match_type === "unmatched_accounting");
+  // As listas são derivadas das linhas de matches: um par provável rejeitado
+  // volta a "Só no Banco" / "Só na Contabilidade"; os grupos um-para-vários
+  // aparecem num único cartão.
+  const { reconciled, probable, bankOnly, acctOnly } = useMemo(() => deriveLists(localMatches), [localMatches]);
 
-  // Soma bruta dos valores sem correspondência de cada lado — distinta da
-  // "Diferença por explicar", que já vem líquida (um lado pode cancelar o
-  // outro). Isto mostra quanto dinheiro está mesmo pendente de revisão.
-  const bankOnlyTotal = bankOnly.reduce((s, m) => s + (m.bank_transaction?.amount ?? 0), 0);
-  const acctOnlyTotal = acctOnly.reduce((s, m) => s + (m.accounting_transaction?.amount ?? 0), 0);
+  // Soma bruta dos valores sem correspondência de cada lado, distinta da
+  // "Diferença por explicar" (um lado pode cancelar o outro). Isto mostra
+  // quanto dinheiro está mesmo pendente de revisão.
+  const bankOnlyTotal = bankOnly.reduce((s, t) => s + t.amount, 0);
+  const acctOnlyTotal = acctOnly.reduce((s, t) => s + t.amount, 0);
 
   function act(matchId: string, next: "confirmed" | "rejected") {
     setActioning(matchId);
     startTransition(async () => {
       await updateMatchStatus(matchId, next, reconciliationId);
-      setLocalMatches((prev) => prev.map((m) => (m.id === matchId ? { ...m, status: next } : m)));
+      setLocalMatches((prev) => {
+        const groupId = prev.find((m) => m.id === matchId)?.group_id ?? null;
+        return prev.map((m) => (m.id === matchId || (groupId && m.group_id === groupId) ? { ...m, status: next } : m));
+      });
       setActioning(null);
     });
   }
@@ -103,8 +91,9 @@ export default function ResultsView({
   async function exportExcel() {
     const XLSX = await import("xlsx");
     const wb = XLSX.utils.book_new();
+    type Cell = string | number;
 
-    const summaryRows = [
+    const summaryRows: Cell[][] = [
       ["Relatório de Conciliação Bancária"],
       [new Date(createdAt).toLocaleString("pt-PT")],
       [],
@@ -122,53 +111,57 @@ export default function ResultsView({
       ["Valor sem correspondência (EUR)", Math.abs(bankOnlyTotal) + Math.abs(acctOnlyTotal)],
       [],
       ["Próximos passos"],
-      ...nextSteps.map((s, i) => [`${i + 1}. ${s}`]),
+      ...nextSteps.map((s, i): Cell[] => [`${i + 1}. ${s}`]),
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryRows), "Resumo");
 
-    const recRows = [["Data", "Descrição", "Valor (EUR)", "Estado"]];
-    reconciled.forEach((m) => {
-      const t = m.bank_transaction ?? m.accounting_transaction;
-      if (t) recRows.push([dmy(t.transaction_date), t.description, String(t.amount), "100% match"]);
+    const recRows: Cell[][] = [
+      ["Data", "Descrição", "Valor (EUR)", "Estado", "Data contabilidade", "Descrição contabilidade", "Valor contabilidade (EUR)"],
+    ];
+    reconciled.forEach(({ tx, other }) => {
+      recRows.push([
+        dmy(tx.transaction_date),
+        tx.description,
+        tx.amount,
+        "100% match",
+        other ? dmy(other.transaction_date) : "",
+        other?.description ?? "",
+        other ? other.amount : "",
+      ]);
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(recRows), "Reconciliados");
 
-    const probRows = [
+    const probRows: Cell[][] = [
       ["Data Banco", "Descrição Banco", "Valor Banco", "Data Contabilidade", "Descrição Contabilidade", "Valor Contabilidade", "Confiança (%)", "Observação"],
     ];
-    localMatches
-      .filter((m) => m.match_type === "probable")
-      .forEach((m) => {
+    // Grupos um-para-vários: uma linha por movimento, com o lado único repetido.
+    probable.forEach((card) => {
+      const rows = Math.max(card.bank.length, card.accounting.length);
+      for (let i = 0; i < rows; i++) {
+        const b = card.bank.length === 1 ? card.bank[0] : card.bank[i];
+        const a = card.accounting.length === 1 ? card.accounting[0] : card.accounting[i];
         probRows.push([
-          m.bank_transaction ? dmy(m.bank_transaction.transaction_date) : "",
-          m.bank_transaction?.description ?? "",
-          String(m.bank_transaction?.amount ?? ""),
-          m.accounting_transaction ? dmy(m.accounting_transaction.transaction_date) : "",
-          m.accounting_transaction?.description ?? "",
-          String(m.accounting_transaction?.amount ?? ""),
-          String(m.confidence ?? ""),
-          m.note ?? "",
+          b ? dmy(b.transaction_date) : "",
+          b?.description ?? "",
+          b ? b.amount : "",
+          a ? dmy(a.transaction_date) : "",
+          a?.description ?? "",
+          a ? a.amount : "",
+          card.confidence ?? "",
+          card.note ?? "",
         ]);
-      });
+      }
+    });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(probRows), "Provaveis");
 
-    const bankRows = [["Data", "Descrição", "Valor (EUR)", "Categoria", "Observação"]];
-    bankOnly.forEach((m) => {
-      if (m.bank_transaction)
-        bankRows.push([dmy(m.bank_transaction.transaction_date), m.bank_transaction.description, String(m.bank_transaction.amount), categoryLabel(m.category), m.note ?? ""]);
-    });
-    bankRows.push([]);
-    bankRows.push(["", "", "Total", String(bankOnlyTotal), ""]);
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bankRows), "So no Banco");
-
-    const acctRows = [["Data", "Descrição", "Valor (EUR)", "Categoria", "Observação"]];
-    acctOnly.forEach((m) => {
-      if (m.accounting_transaction)
-        acctRows.push([dmy(m.accounting_transaction.transaction_date), m.accounting_transaction.description, String(m.accounting_transaction.amount), categoryLabel(m.category), m.note ?? ""]);
-    });
-    acctRows.push([]);
-    acctRows.push(["", "", "Total", String(acctOnlyTotal), ""]);
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(acctRows), "So na Contabilidade");
+    const unmatchedSheet = (rows: UnmatchedRow[], total: number): Cell[][] => [
+      ["Data", "Descrição", "Valor (EUR)", "Categoria", "Observação"],
+      ...rows.map((t): Cell[] => [dmy(t.transaction_date), t.description, t.amount, categoryLabel(t.category), t.note ?? ""]),
+      [],
+      ["", "", "Total", total, ""],
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(unmatchedSheet(bankOnly, bankOnlyTotal)), "So no Banco");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(unmatchedSheet(acctOnly, acctOnlyTotal)), "So na Contabilidade");
 
     XLSX.writeFile(wb, `Match_${createdAt.slice(0, 10)}.xlsx`);
   }
@@ -238,19 +231,19 @@ export default function ResultsView({
       <div className="mt-5">
         {tab === "reconciled" && (
           <SimpleTable
-            rows={reconciled.map((m) => ({ ...(m.bank_transaction ?? m.accounting_transaction!), note: null }))}
+            rows={reconciled.map(({ tx }) => ({ ...tx, note: null }))}
             badge={<span className="rounded-full bg-accent-50 px-2.5 py-0.5 text-[11px] font-bold text-accent-600">100% match</span>}
           />
         )}
         {tab === "bankonly" && (
           <GroupedUnmatchedTable
-            rows={bankOnly.map((m) => ({ ...m.bank_transaction!, note: m.note, category: m.category })).filter((t) => t.id)}
+            rows={bankOnly}
             total={bankOnlyTotal}
           />
         )}
         {tab === "acctonly" && (
           <GroupedUnmatchedTable
-            rows={acctOnly.map((m) => ({ ...m.accounting_transaction!, note: m.note, category: m.category })).filter((t) => t.id)}
+            rows={acctOnly}
             total={acctOnlyTotal}
           />
         )}
@@ -262,10 +255,18 @@ export default function ResultsView({
           ) : (
             <div className="flex flex-col gap-3">
               {probable.map((m) => (
-                <div key={m.id} className="rounded-xl border border-black/10 bg-white p-4 shadow-sm">
+                <div key={m.matchId} className="rounded-xl border border-black/10 bg-white p-4 shadow-sm">
                   <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-center">
-                    <PairSide label="Banco" tx={m.bank_transaction} />
-                    <PairSide label="Contabilidade" tx={m.accounting_transaction} />
+                    <div className="flex flex-col gap-2">
+                      {m.bank.map((t, i) => (
+                        <PairSide key={t.id} label={i === 0 ? "Banco" : ""} tx={t} />
+                      ))}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {m.accounting.map((t, i) => (
+                        <PairSide key={t.id} label={i === 0 ? "Contabilidade" : ""} tx={t} />
+                      ))}
+                    </div>
                     <div className="text-center">
                       <div
                         className={`mx-auto flex h-12 w-12 items-center justify-center rounded-full font-mono text-xs font-bold ${
@@ -282,15 +283,15 @@ export default function ResultsView({
                     </div>
                     <div className="flex gap-2 sm:flex-col">
                       <button
-                        disabled={pending && actioning === m.id}
-                        onClick={() => act(m.id, "confirmed")}
+                        disabled={pending && actioning === m.matchId}
+                        onClick={() => act(m.matchId, "confirmed")}
                         className="rounded-lg bg-accent-50 px-3 py-1.5 text-xs font-semibold text-accent-600 transition hover:bg-accent-500 hover:text-white disabled:opacity-50"
                       >
                         Confirmar
                       </button>
                       <button
-                        disabled={pending && actioning === m.id}
-                        onClick={() => act(m.id, "rejected")}
+                        disabled={pending && actioning === m.matchId}
+                        onClick={() => act(m.matchId, "rejected")}
                         className="rounded-lg bg-danger-50 px-3 py-1.5 text-xs font-semibold text-danger-600 transition hover:bg-danger-600 hover:text-white disabled:opacity-50"
                       >
                         Rejeitar
@@ -391,8 +392,6 @@ function SimpleTable({ rows, badge }: { rows: (Tx & { note?: string | null })[];
   );
 }
 
-type UnmatchedRow = Tx & { note: string | null; category: string | null };
-
 // Movimentos sem correspondência, agrupados pela categoria devolvida pelo
 // Claude (ver CATEGORY_LABELS acima), cada grupo com o seu subtotal — para o
 // contabilista perceber de imediato qual é a causa mais comum e quanto
@@ -461,8 +460,8 @@ function GroupedUnmatchedTable({ rows, total }: { rows: UnmatchedRow[]; total: n
 function PairSide({ label, tx }: { label: string; tx: Tx | null }) {
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-wide text-foreground/40">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-foreground">{tx?.description ?? "—"}</p>
+      {label && <p className="text-[10px] font-bold uppercase tracking-wide text-foreground/40">{label}</p>}
+      <p className={`${label ? "mt-1 " : ""}text-sm font-semibold text-foreground`}>{tx?.description ?? "—"}</p>
       <p className="mt-0.5 flex gap-3 text-xs text-foreground/55">
         <span>{tx ? dmy(tx.transaction_date) : ""}</span>
         <span className="font-mono font-semibold text-foreground">{tx ? euro(tx.amount) : ""}</span>
