@@ -3,12 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { StatusBadge } from "@/components/status-badge";
 import NewReconciliationForm from "./new-reconciliation-form";
 import DeleteReconciliationButton from "./delete-button";
+import { FlowSteps } from "@/components/flow-steps";
 
-// A Server Action de nova conciliação faz várias chamadas ao modelo (duas
-// leituras em paralelo, eventual repetição e o texto do relatório): o limite
-// por omissão pode ser curto. Aplica-se às Server Actions usadas nesta página
-// (ver route segment config maxDuration na documentação do Next.js).
-export const maxDuration = 180;
+// A Server Action desta página só carrega os ficheiros (a leitura e a
+// reconciliação são passos seguintes, com o seu próprio limite de tempo).
+export const maxDuration = 60;
 
 function euro(n: number | null) {
   return n == null ? "—" : new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(n);
@@ -26,9 +25,10 @@ export default async function ReconciliacaoPage() {
   return (
     <div className="flex flex-col gap-10">
       <div>
+        <FlowSteps current={1} />
         <h1 className="text-xl font-bold text-brand-700">Nova conciliação</h1>
         <p className="mt-1 text-sm text-foreground/60">
-          Carrega o extrato bancário e o extrato da contabilidade em PDF. O resto é automático.
+          Carrega o extrato bancário e o extrato da contabilidade, em PDF ou Excel.
         </p>
         <div className="mt-4">
           <NewReconciliationForm />
@@ -52,7 +52,7 @@ export default async function ReconciliacaoPage() {
               {!reconciliations || reconciliations.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-sm text-foreground/40">
-                    Sem conciliações ainda. Carrega os dois PDFs acima para começar.
+                    Sem conciliações ainda. Carrega os dois ficheiros acima para começar.
                   </td>
                 </tr>
               ) : (
@@ -63,7 +63,11 @@ export default async function ReconciliacaoPage() {
                     </td>
                     <td className="max-w-md px-4 py-2.5">
                       <Link href={`/reconciliations/${r.id}`} className="font-medium text-brand-700 hover:underline">
-                        {r.summary ? r.summary.slice(0, 90) + (r.summary.length > 90 ? "…" : "") : "Ver relatório"}
+                        {r.summary
+                          ? r.summary.slice(0, 90) + (r.summary.length > 90 ? "…" : "")
+                          : r.status === "review"
+                            ? "Continuar a preparar os dados"
+                            : "Ver relatório"}
                       </Link>
                     </td>
                     <td className="px-4 py-2.5 font-mono text-xs">{euro(r.difference)}</td>

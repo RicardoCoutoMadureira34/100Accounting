@@ -11,6 +11,8 @@ export interface ReadLine {
   credit: number | null;
   balanceAfter: number | null;
   page: number;
+  // Página (p2) ou linha da folha (L15) de onde veio o movimento.
+  origin?: string;
 }
 
 export interface StatementData {
@@ -56,7 +58,15 @@ export function amountInCents(kind: StatementKind, debit: number | null, credit:
   return kind === "bank" ? c - d : d - c;
 }
 
-export function verifyStatement(kind: StatementKind, data: StatementData): Verification {
+// fixSigns: corrige o sinal de um movimento quando contradiz a variação do
+// saldo (só na leitura). No ecrã de confirmação não se corrige nada em silêncio,
+// porque o utilizador pode ter editado os valores.
+export function verifyStatement(
+  kind: StatementKind,
+  data: StatementData,
+  options: { fixSigns?: boolean } = {}
+): Verification {
+  const fixSigns = options.fixSigns ?? true;
   const lines: SignedLine[] = data.lines.map((l, index) => ({
     ...l,
     index,
@@ -77,7 +87,7 @@ export function verifyStatement(kind: StatementKind, data: StatementData): Verif
         runningChecked = true;
         const delta = balance - prev;
         if (delta !== line.amountCents) {
-          if (line.amountCents !== 0 && delta === -line.amountCents) {
+          if (fixSigns && line.amountCents !== 0 && delta === -line.amountCents) {
             const oldDebit = line.debit;
             line.debit = line.credit;
             line.credit = oldDebit;

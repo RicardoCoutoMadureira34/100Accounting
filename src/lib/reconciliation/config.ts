@@ -12,6 +12,10 @@ export const ALLOW_SCANNED_PDFS = false;
 // considerado digitalizado.
 export const MIN_EXTRACTED_CHARS = 40;
 
+// PDFs com mais páginas do que isto são lidos por blocos de páginas (uma
+// chamada por bloco) e juntados, para não perder linhas.
+export const PDF_PAGES_PER_CHUNK = 4;
+
 // ---------- Emparelhamento ----------
 
 // Mesmo valor mas datas mais afastadas do que isto passa a "provável".

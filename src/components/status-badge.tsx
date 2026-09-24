@@ -1,6 +1,7 @@
 const LABELS: Record<string, { label: string; className: string }> = {
   pending: { label: "Pendente", className: "bg-black/5 text-foreground/60" },
   processing: { label: "A processar", className: "bg-amber-100 text-amber-700" },
+  review: { label: "Por confirmar", className: "bg-amber-100 text-amber-700" },
   completed: { label: "Concluída", className: "bg-accent-50 text-accent-600" },
   failed: { label: "Falhou", className: "bg-danger-50 text-danger-600" },
 };

@@ -39,6 +39,59 @@ export type Database = {
   }
   public: {
     Tables: {
+      extraction_logs: {
+        Row: {
+          created_at: string
+          difference_eur: number | null
+          edited_lines: number
+          file_format: string
+          id: string
+          line_count: number
+          reconciliation_id: string | null
+          retried: boolean
+          source: string
+          source_name: string | null
+          step2_skipped: boolean | null
+          verified: boolean
+        }
+        Insert: {
+          created_at?: string
+          difference_eur?: number | null
+          edited_lines?: number
+          file_format: string
+          id?: string
+          line_count?: number
+          reconciliation_id?: string | null
+          retried?: boolean
+          source: string
+          source_name?: string | null
+          step2_skipped?: boolean | null
+          verified?: boolean
+        }
+        Update: {
+          created_at?: string
+          difference_eur?: number | null
+          edited_lines?: number
+          file_format?: string
+          id?: string
+          line_count?: number
+          reconciliation_id?: string | null
+          retried?: boolean
+          source?: string
+          source_name?: string | null
+          step2_skipped?: boolean | null
+          verified?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extraction_logs_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "reconciliations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       matches: {
         Row: {
           accounting_transaction_id: string | null
@@ -201,6 +254,148 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      statement_documents: {
+        Row: {
+          closing_balance: number | null
+          conversion_problems: number
+          created_at: string
+          file_format: string
+          file_name: string
+          id: string
+          issues: Json
+          lines_deleted: number
+          opening_balance: number | null
+          opening_row_credits: number | null
+          opening_row_debits: number | null
+          period_end: string | null
+          period_start: string | null
+          read_error: string | null
+          read_status: string
+          reconciliation_id: string
+          retried: boolean
+          source: string
+          source_name: string | null
+          total_credits: number | null
+          total_debits: number | null
+          updated_at: string
+        }
+        Insert: {
+          closing_balance?: number | null
+          conversion_problems?: number
+          created_at?: string
+          file_format: string
+          file_name: string
+          id?: string
+          issues?: Json
+          lines_deleted?: number
+          opening_balance?: number | null
+          opening_row_credits?: number | null
+          opening_row_debits?: number | null
+          period_end?: string | null
+          period_start?: string | null
+          read_error?: string | null
+          read_status?: string
+          reconciliation_id: string
+          retried?: boolean
+          source: string
+          source_name?: string | null
+          total_credits?: number | null
+          total_debits?: number | null
+          updated_at?: string
+        }
+        Update: {
+          closing_balance?: number | null
+          conversion_problems?: number
+          created_at?: string
+          file_format?: string
+          file_name?: string
+          id?: string
+          issues?: Json
+          lines_deleted?: number
+          opening_balance?: number | null
+          opening_row_credits?: number | null
+          opening_row_debits?: number | null
+          period_end?: string | null
+          period_start?: string | null
+          read_error?: string | null
+          read_status?: string
+          reconciliation_id?: string
+          retried?: boolean
+          source?: string
+          source_name?: string | null
+          total_credits?: number | null
+          total_debits?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "statement_documents_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "reconciliations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      statement_lines: {
+        Row: {
+          amount: number
+          balance_after: number | null
+          created_at: string
+          credit: number | null
+          date: string
+          debit: number | null
+          description: string
+          edited: boolean
+          id: string
+          origin: string | null
+          position: number
+          reconciliation_id: string
+          reference: string | null
+          source: string
+        }
+        Insert: {
+          amount: number
+          balance_after?: number | null
+          created_at?: string
+          credit?: number | null
+          date: string
+          debit?: number | null
+          description?: string
+          edited?: boolean
+          id?: string
+          origin?: string | null
+          position: number
+          reconciliation_id: string
+          reference?: string | null
+          source: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number | null
+          created_at?: string
+          credit?: number | null
+          date?: string
+          debit?: number | null
+          description?: string
+          edited?: boolean
+          id?: string
+          origin?: string | null
+          position?: number
+          reconciliation_id?: string
+          reference?: string | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "statement_lines_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "reconciliations"
             referencedColumns: ["id"]
           },
         ]

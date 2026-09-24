@@ -2,21 +2,19 @@
 
 import { useActionState, useRef, useState } from "react";
 import { createReconciliation, type ActionState } from "../reconciliations/actions";
-import ProcessingAnimation from "./processing-animation";
 
 const initialState: ActionState = { error: null };
 
 export default function NewReconciliationForm() {
   const [state, action, pending] = useActionState(createReconciliation, initialState);
 
-  if (pending) return <ProcessingAnimation />;
-
   return (
     <form action={action} className="flex flex-col gap-5 rounded-2xl border border-black/10 bg-white p-6 shadow-sm">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Dropzone name="bank_file" label="Extrato Bancário" hint="O extrato emitido pelo banco (PDF)" />
-        <Dropzone name="accounting_file" label="Extrato da Contabilidade" hint="Conta corrente / razão (PDF)" />
+        <Dropzone name="bank_file" label="Extrato Bancário" hint="O extrato emitido pelo banco" />
+        <Dropzone name="accounting_file" label="Extrato da Contabilidade" hint="Conta corrente / razão" />
       </div>
+      <p className="-mt-1 text-xs text-foreground/50">PDF ou Excel. Com Excel é mais rápido e mais seguro.</p>
 
       {state.error && (
         <p className="flex items-start gap-2 rounded-lg bg-danger-50 px-3 py-2.5 text-sm font-medium text-danger-600">
@@ -31,12 +29,13 @@ export default function NewReconciliationForm() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <button
           type="submit"
-          className="rounded-xl bg-accent-500 px-6 py-3 text-sm font-bold text-white shadow-sm shadow-accent-500/20 transition hover:bg-accent-600"
+          disabled={pending}
+          className="rounded-xl bg-accent-500 px-6 py-3 text-sm font-bold text-white shadow-sm shadow-accent-500/20 transition hover:bg-accent-600 disabled:cursor-wait disabled:opacity-70"
         >
-          Iniciar Conciliação
+          {pending ? "A carregar os ficheiros…" : "Carregar e continuar"}
         </button>
         <p className="text-xs text-foreground/45">
-          O Match lê os dois PDFs e cruza os movimentos automaticamente, cerca de um minuto.
+          A seguir vais poder confirmar os dados lidos antes de reconciliar.
         </p>
       </div>
     </form>
@@ -83,7 +82,7 @@ function Dropzone({ name, label, hint }: { name: string; label: string; hint: st
         ref={inputRef}
         type="file"
         name={name}
-        accept="application/pdf,.pdf"
+        accept="application/pdf,.pdf,.xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
         required
         hidden
         onChange={(e) => setFile(e.target.files?.[0] ?? null)}

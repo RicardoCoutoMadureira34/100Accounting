@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { FlowSteps } from "@/components/flow-steps";
 import ResultsView, { type MatchRow } from "./results-view";
 
 export default async function ReconciliationResultsPage({
@@ -21,6 +22,18 @@ export default async function ReconciliationResultsPage({
 
   if (!reconciliation) notFound();
 
+  // Ainda no passo 2 (dados por confirmar): o resultado ainda não existe.
+  if (reconciliation.status === "review" || reconciliation.status === "pending") {
+    redirect(`/reconciliations/${id}/dados`);
+  }
+
+  // Conciliações antigas (anteriores ao passo 2) não têm dados guardados.
+  const { count: documentCount } = await supabase
+    .from("statement_documents")
+    .select("id", { count: "exact", head: true })
+    .eq("reconciliation_id", id);
+  const hasData = (documentCount ?? 0) > 0;
+
   const { data: matches } = await supabase
     .from("matches")
     .select(
@@ -33,9 +46,19 @@ export default async function ReconciliationResultsPage({
 
   return (
     <div>
-      <Link href="/reconciliacao" className="text-xs font-medium text-foreground/50 hover:text-foreground">
-        ← Conciliações
-      </Link>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Link href="/reconciliacao" className="text-xs font-medium text-foreground/50 hover:text-foreground">
+          ← Conciliações
+        </Link>
+        {hasData && (
+          <Link href={`/reconciliations/${id}/dados`} className="text-xs font-semibold text-accent-600 hover:underline">
+            Ver dados lidos
+          </Link>
+        )}
+      </div>
+      <div className="mt-2">
+        <FlowSteps current={3} hrefs={{ 1: "/reconciliacao", ...(hasData ? { 2: `/reconciliations/${id}/dados` } : {}) }} />
+      </div>
       <ResultsView
         reconciliationId={reconciliation.id}
         createdAt={reconciliation.created_at}

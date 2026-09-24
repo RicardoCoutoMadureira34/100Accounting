@@ -30,3 +30,26 @@ export function buildPdf(pages: { x: number; y: number; text: string }[][]): Uin
   pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
   return new TextEncoder().encode(pdf);
 }
+
+// Cliente falso do modelo: devolve respostas pré-definidas em vez de chamar a API.
+export function fakeModelClient(respond: (system: string, userText: string, callIndex: number) => unknown) {
+  const calls: { system: string; userText: string }[] = [];
+  const client = {
+    messages: {
+      stream: (params: { system: { text: string }[]; messages: { content: { type: string; text?: string }[] }[] }) => {
+        const system = params.system[0].text;
+        const userText = params.messages[0].content.map((c) => c.text ?? "").join("\n");
+        const index = calls.length;
+        calls.push({ system, userText });
+        return {
+          finalMessage: async () => {
+            const parsed = respond(system, userText, index);
+            if (parsed instanceof Error) throw parsed;
+            return { usage: { input_tokens: 1, output_tokens: 1 }, stop_reason: "end_turn", parsed_output: parsed };
+          },
+        };
+      },
+    },
+  } as unknown as import("./anthropic").ModelClient;
+  return { client, calls };
+}

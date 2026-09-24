@@ -42,6 +42,7 @@ const read = (over: Partial<StatementRead>): StatementRead => ({
   issues: [],
   periodStart: "2026-06-01",
   periodEnd: "2026-06-30",
+  sourceName: null,
   openingBalance: 0,
   closingBalance: 0,
   documentTotalDebits: null,
@@ -153,7 +154,7 @@ describe("pipeline completo com cliente falso", () => {
     const { client, calls } = fakeClient((system, userText) => {
       if (system.includes("contabilista sénior")) {
         return {
-          unmatchedBank: [{ id: 1, category: "categoria_inventada", observation: "Compra ainda não lançada" }],
+          unmatchedBank: [{ id: 2000, category: "categoria_inventada", observation: "Compra ainda não lançada" }],
           unmatchedAccounting: [],
           summary: "ok",
           nextSteps: ["passo"],
@@ -169,7 +170,7 @@ describe("pipeline completo com cliente falso", () => {
     assert.equal(payload.openingDifference, "5057,54 €");
     assert.equal(payload.higherOpeningBalanceIn, "contabilidade");
     assert.deepEqual(payload.pending, { unmatchedBank: 1, unmatchedAccounting: 0, probablePairs: 0 });
-    assert.equal(payload.unmatchedBank[0].id, 1, "o id só existe nos sem correspondência, para associar a categoria");
+    assert.equal(payload.unmatchedBank[0].id, 2000, "o id só existe nos sem correspondência, para associar a categoria");
     assert.equal(payload.unmatchedBank[0].description, "COMPRA");
     for (const pair of payload.probablePairs) {
       for (const t of [...pair.bank, ...pair.accounting]) assert.equal("id" in t, false);
@@ -231,7 +232,7 @@ describe("indicações obrigatórias no resultado final", () => {
     });
     const { client, calls } = fakeClient((system, userText) => {
       if (system.includes("contabilista sénior")) {
-        return narrativeReply([{ id: 0, category: "cheque_em_transito", observation: "Cheque ainda não compensado" }], []);
+        return narrativeReply([{ id: 1000, category: "cheque_em_transito", observation: "Cheque ainda não compensado" }], []);
       }
       return userText.includes("extrato bancário") ? bankReading : acctReading;
     });
@@ -262,7 +263,7 @@ describe("indicações obrigatórias no resultado final", () => {
     });
     const { client } = fakeClient((system, userText) => {
       if (system.includes("contabilista sénior")) {
-        return narrativeReply([], [{ id: 1, category: "outro", observation: "Pagamento por lançar" }]);
+        return narrativeReply([], [{ id: 2000, category: "outro", observation: "Pagamento por lançar" }]);
       }
       return userText.includes("extrato bancário") ? bankReading : acctReading;
     });

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { callStructured, type Content, type ModelClient } from "./anthropic";
-import { ALLOW_SCANNED_PDFS } from "./config";
+import { ALLOW_SCANNED_PDFS, PDF_PAGES_PER_CHUNK } from "./config";
 import { KIND_LABEL, UserFacingError, scannedMessage, type StatementKind } from "./errors";
 import { extractPdfText } from "./pdf-text";
 import { unverifiedWarning, verificationGap, verifyStatement, type StatementData, type Verification } from "./verify";
@@ -26,6 +26,10 @@ export const StatementReadSchema = z.object({
   closingBalance: z.number().nullable().describe("Saldo final do período"),
   documentTotalDebits: z.number().nullable().describe("Total de débitos que o próprio documento mostra, se existir"),
   documentTotalCredits: z.number().nullable().describe("Total de créditos que o próprio documento mostra, se existir"),
+  sourceName: z
+    .string()
+    .nullable()
+    .describe("Banco ou programa de contabilidade que emitiu o documento (ex.: Millennium BCP, PHC), se se perceber; senão null"),
   openingRowDebits: z
     .number()
     .nullable()
@@ -54,6 +58,8 @@ REGRAS
 - openingBalance e closingBalance: o saldo na linha de "Saldo inicial" (ou saldo anterior) e o saldo final do período. Numa linha de saldo inicial podem aparecer também débitos e créditos ACUMULADOS: não são movimentos; devolve-os em openingRowDebits e openingRowCredits (null se não existirem).
 - documentTotalDebits e documentTotalCredits: os valores das colunas Débito e Crédito na linha "Total" do documento (tal como aparecem, mesmo que incluam os acumulados), só se essa linha existir.
 - page é o número do marcador de página onde o movimento aparece.
+- sourceName: o nome do banco ou do programa de contabilidade que emitiu o documento, se se perceber pelo cabeçalho ou rodapé; senão null.
+- Se te disserem que recebes apenas um BLOCO de páginas de um documento maior, devolve só os movimentos dessas páginas; os saldos, totais e período só se aparecerem nesse bloco (senão null).
 - NUNCA inventes valores, datas ou descrições. Se algo estiver ilegível, regista em issues.`;
 
 const KIND_NOTES: Record<StatementKind, string> = {
@@ -65,6 +71,8 @@ const KIND_NOTES: Record<StatementKind, string> = {
 export interface PreparedDocument {
   kind: StatementKind;
   text: string;
+  // Texto de cada página (já com as colunas etiquetadas), para ler por blocos.
+  pages: string[];
   scanned: boolean;
   pdf: Uint8Array;
 }
@@ -72,11 +80,38 @@ export interface PreparedDocument {
 // Passo local (sem API): extrai o texto com colunas e deteta digitalizações.
 export async function prepareDocument(kind: StatementKind, pdf: Uint8Array): Promise<PreparedDocument> {
   const extracted = await extractPdfText(pdf);
-  return { kind, text: extracted.text, scanned: extracted.scanned, pdf };
+  return { kind, text: extracted.text, pages: extracted.pages, scanned: extracted.scanned, pdf };
 }
 
-function buildContent(doc: PreparedDocument, retryNote?: string): Content {
-  const intro = `Tipo de documento: ${KIND_LABEL[doc.kind]}. ${KIND_NOTES[doc.kind]}`;
+export interface Chunk {
+  text: string;
+  from: number; // 1-based
+  to: number;
+  total: number;
+}
+
+// PDFs longos leem-se por blocos de páginas (uma chamada por bloco) para não
+// perder linhas; até PDF_PAGES_PER_CHUNK páginas continua a ser uma só chamada.
+export function splitIntoChunks(pages: string[], perChunk: number = PDF_PAGES_PER_CHUNK): Chunk[] {
+  const marker = (n: number, text: string) => "=== Página " + n + " ===\n" + text;
+  if (pages.length <= perChunk) {
+    return [{ text: pages.map((p, i) => marker(i + 1, p)).join("\n\n"), from: 1, to: pages.length, total: pages.length }];
+  }
+  const chunks: Chunk[] = [];
+  for (let start = 0; start < pages.length; start += perChunk) {
+    const slice = pages.slice(start, start + perChunk);
+    chunks.push({
+      text: slice.map((p, i) => marker(start + i + 1, p)).join("\n\n"),
+      from: start + 1,
+      to: start + slice.length,
+      total: pages.length,
+    });
+  }
+  return chunks;
+}
+
+function buildContent(doc: PreparedDocument, retryNote?: string, chunk?: Chunk): Content {
+  const intro = "Tipo de documento: " + KIND_LABEL[doc.kind] + ". " + KIND_NOTES[doc.kind];
   const content: Content = [{ type: "text", text: intro }];
   if (doc.scanned) {
     content.push({
@@ -84,11 +119,58 @@ function buildContent(doc: PreparedDocument, retryNote?: string): Content {
       source: { type: "base64", media_type: "application/pdf", data: Buffer.from(doc.pdf).toString("base64") },
     });
   } else {
-    content.push({ type: "text", text: doc.text });
+    if (chunk && chunk.total > chunk.to - chunk.from + 1) {
+      content.push({
+        type: "text",
+        text:
+          "Recebes apenas um BLOCO do documento: as páginas " +
+          chunk.from +
+          " a " +
+          chunk.to +
+          " de " +
+          chunk.total +
+          ". Devolve só os movimentos destas páginas.",
+      });
+    }
+    content.push({ type: "text", text: chunk ? chunk.text : doc.text });
   }
   if (retryNote) content.push({ type: "text", text: retryNote });
   else content.push({ type: "text", text: "Transcreve todos os movimentos deste documento." });
   return content;
+}
+
+// Junta as leituras de vários blocos do mesmo documento.
+export function mergeReads(reads: StatementRead[]): StatementRead {
+  function firstNonNull<T>(pick: (r: StatementRead) => T | null): T | null {
+    for (const r of reads) {
+      const v = pick(r);
+      if (v != null) return v;
+    }
+    return null;
+  }
+  function lastNonNull<T>(pick: (r: StatementRead) => T | null): T | null {
+    for (let i = reads.length - 1; i >= 0; i--) {
+      const v = pick(reads[i]);
+      if (v != null) return v;
+    }
+    return null;
+  }
+  const usable = reads.filter((r) => r.readable);
+  return {
+    readable: usable.length > 0,
+    issues: [...new Set(reads.flatMap((r) => r.issues))],
+    periodStart: firstNonNull((r) => r.periodStart),
+    periodEnd: lastNonNull((r) => r.periodEnd),
+    // Saldo inicial e acumulados: no primeiro bloco; saldo final e totais: no último.
+    openingBalance: firstNonNull((r) => r.openingBalance),
+    closingBalance: lastNonNull((r) => r.closingBalance),
+    documentTotalDebits: lastNonNull((r) => r.documentTotalDebits),
+    documentTotalCredits: lastNonNull((r) => r.documentTotalCredits),
+    sourceName: firstNonNull((r) => r.sourceName),
+    openingRowDebits: firstNonNull((r) => r.openingRowDebits),
+    openingRowCredits: firstNonNull((r) => r.openingRowCredits),
+    lines: reads.flatMap((r) => r.lines),
+  };
 }
 
 export interface StatementOutcome {
@@ -96,7 +178,10 @@ export interface StatementOutcome {
   read: StatementRead;
   verification: Verification;
   verified: boolean;
-  // Avisos para mostrar ao utilizador (problemas de leitura, sinais corrigidos, leitura não verificada).
+  retried: boolean;
+  // Avisos da leitura (problemas reportados pelo modelo e sinais corrigidos).
+  readIssues: string[];
+  // readIssues + aviso de leitura não verificada.
   issues: string[];
 }
 
@@ -124,29 +209,38 @@ export async function readStatement(
   }
 
   const label = KIND_LABEL[doc.kind];
-  const call = (retryNote?: string) =>
+  const chunks: (Chunk | undefined)[] = doc.scanned ? [undefined] : splitIntoChunks(doc.pages);
+  const callChunk = (chunk: Chunk | undefined, index: number, retryNote?: string) =>
     callStructured({
       client: opts.client,
-      label: `read-${doc.kind}${retryNote ? "-retry" : ""}`,
+      label:
+        "read-" + doc.kind + (chunks.length > 1 ? "-" + (index + 1) + "of" + chunks.length : "") + (retryNote ? "-retry" : ""),
       system: READ_SYSTEM_PROMPT,
-      content: buildContent(doc, retryNote),
+      content: buildContent(doc, retryNote, chunk),
       schema: StatementReadSchema,
       maxTokens: 64000,
     });
+  const call = async (retryNote?: string): Promise<StatementRead> => {
+    const reads = await Promise.all(chunks.map((c, i) => callChunk(c, i, retryNote)));
+    return reads.length === 1 ? reads[0] : mergeReads(reads);
+  };
 
   let read = await call();
   if (!read.readable || read.lines.length === 0) {
     const why = read.issues[0] ?? "não foram encontrados movimentos";
-    throw new UserFacingError(`Não foi possível ler o ${label}: ${why}.`);
+    throw new UserFacingError("Não foi possível ler o " + label + ": " + why + ".");
   }
 
   let verification = verifyStatement(doc.kind, toData(read));
+  let retried = false;
 
   if (!verification.ok && verification.performedChecks > 0) {
+    retried = true;
     const note =
-      `ATENÇÃO: a tua leitura anterior não bate certo: ${verification.failures.join("; ")}. ` +
-      `Há movimentos em falta, repetidos ou com Débito/Crédito trocados. Volta a ler o documento com muito cuidado, ` +
-      `linha a linha, e devolve a leitura completa e corrigida.`;
+      "ATENÇÃO: a tua leitura anterior não bate certo: " +
+      verification.failures.join("; ") +
+      ". Há movimentos em falta, repetidos ou com Débito/Crédito trocados. Volta a ler o documento com muito cuidado, " +
+      "linha a linha, e devolve a leitura completa e corrigida.";
     try {
       const second = await call(note);
       if (second.readable && second.lines.length > 0) {
@@ -157,15 +251,15 @@ export async function readStatement(
         }
       }
     } catch (e) {
-      console.error(`[reconciliation] retry de leitura falhou (${doc.kind}):`, e);
+      console.error("[reconciliation] retry de leitura falhou (" + doc.kind + "):", e);
     }
   }
 
-  const issues = [
-    ...read.issues.map((i) => `${label[0].toUpperCase()}${label.slice(1)}: ${i}`),
+  const readIssues = [
+    ...read.issues.map((i) => label[0].toUpperCase() + label.slice(1) + ": " + i),
     ...verification.corrections,
   ];
-  if (!verification.ok) issues.push(unverifiedWarning(doc.kind, verification));
+  const issues = verification.ok ? readIssues : [...readIssues, unverifiedWarning(doc.kind, verification)];
 
-  return { kind: doc.kind, read, verification, verified: verification.ok, issues };
+  return { kind: doc.kind, read, verification, verified: verification.ok, retried, readIssues, issues };
 }
