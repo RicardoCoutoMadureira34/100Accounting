@@ -20,7 +20,7 @@ function loadEnv() {
   }
 }
 
-// "12.450,80" / "-4.860,00" / "0,00" -> número
+// "12.450,80" / "-4.860,00" / "0,00" -> número safsdfsdfdsf
 const pt = (s: string): number => Number(s.replace(/\./g, "").replace(",", "."));
 const NUM = String.raw`(-?[\d.]+,\d{2})`;
 
