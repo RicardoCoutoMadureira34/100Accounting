@@ -7,6 +7,7 @@ const tx = (id: string, date: string, description: string, amount: number): Tx =
   transaction_date: date,
   description,
   amount,
+  reference: null,
 });
 
 const row = (over: Partial<MatchRow> & Pick<MatchRow, "id" | "match_type">): MatchRow => ({

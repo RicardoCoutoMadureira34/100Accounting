@@ -3,25 +3,10 @@
 import { useMemo, useState, useTransition } from "react";
 import { updateMatchStatus } from "../actions";
 import { StatusBadge } from "@/components/status-badge";
-import { deriveLists, type MatchRow, type Tx, type UnmatchedRow } from "@/lib/reconciliation/results";
+import { categoryLabel, deriveLists, probableGroups, type MatchRow, type Tx, type UnmatchedRow } from "@/lib/reconciliation/results";
+import { buildPendentesWorkbook, pendentesFilename } from "@/lib/reconciliation/pendentes";
 
 export type { MatchRow };
-
-// Categorias fixas para movimentos sem correspondência (ver
-// UNMATCHED_CATEGORIES em src/lib/reconciliation/narrative.ts): rótulos
-// para o ecrã e o Excel. "outra_sem_categoria" cobre matches antigos gravados
-// antes desta coluna existir e pares prováveis rejeitados (category === null).
-const CATEGORY_LABELS: Record<string, string> = {
-  cheque_em_transito: "Cheque em trânsito",
-  deposito_em_transito: "Depósito em trânsito",
-  debito_nao_registado: "Débito ainda não registado",
-  comissao_juro_bancario: "Comissão / juro bancário",
-  erro_transcricao: "Possível erro de transcrição",
-  duplicado: "Possível duplicado",
-  outro: "Outro",
-  outra_sem_categoria: "Sem categoria",
-};
-const categoryLabel = (c: string | null) => CATEGORY_LABELS[c ?? "outra_sem_categoria"] ?? CATEGORY_LABELS.outra_sem_categoria;
 
 const euro = (n: number | null) =>
   n == null ? "—" : new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(n);
@@ -39,6 +24,10 @@ export default function ResultsView({
   status,
   bankBalance,
   accountingBalance,
+  bankOpeningBalance,
+  accountingOpeningBalance,
+  periodStart,
+  periodEnd,
   difference,
   closes,
   summary,
@@ -51,6 +40,10 @@ export default function ResultsView({
   status: string;
   bankBalance: number | null;
   accountingBalance: number | null;
+  bankOpeningBalance: number | null;
+  accountingOpeningBalance: number | null;
+  periodStart: string | null;
+  periodEnd: string | null;
   difference: number | null;
   closes: boolean | null;
   summary: string | null;
@@ -166,6 +159,33 @@ export default function ResultsView({
     XLSX.writeFile(wb, `Match_${createdAt.slice(0, 10)}.xlsx`);
   }
 
+  // Ficheiro só com os movimentos sem correspondência (para a contabilista
+  // lançar/regularizar) + o mapa de reconciliação. Considera o estado atual
+  // do ecrã: um provável rejeitado conta como sem correspondência.
+  async function exportPendentes() {
+    const input = {
+      createdAt,
+      periodStart,
+      periodEnd,
+      bankBalance,
+      accountingBalance,
+      bankOpeningBalance,
+      accountingOpeningBalance,
+      bankOnly,
+      acctOnly,
+      probable: probableGroups(localMatches),
+    };
+    const wb = buildPendentesWorkbook(input);
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = pendentesFilename(input);
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="mt-2">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -175,12 +195,20 @@ export default function ResultsView({
             {new Date(createdAt).toLocaleString("pt-PT", { dateStyle: "long", timeStyle: "short" })} · <StatusBadge status={status} />
           </p>
         </div>
-        <button
-          onClick={exportExcel}
-          className="rounded-lg bg-accent-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-600"
-        >
-          Exportar para Excel
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={exportPendentes}
+            className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-accent-600 ring-1 ring-accent-500/30 transition hover:bg-accent-50"
+          >
+            Descarregar pendentes (Excel)
+          </button>
+          <button
+            onClick={exportExcel}
+            className="rounded-lg bg-accent-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-600"
+          >
+            Exportar para Excel
+          </button>
+        </div>
       </div>
 
       {issues.length > 0 && (

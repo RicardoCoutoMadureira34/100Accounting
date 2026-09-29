@@ -2,11 +2,29 @@
 // Banco, Só na Contabilidade) a partir das linhas de "matches". Lógica pura
 // para poder ser testada sem base de dados nem React.
 
+// Categorias fixas para movimentos sem correspondência (ver
+// UNMATCHED_CATEGORIES em narrative.ts): rótulos para o ecrã e os Excel.
+// "outra_sem_categoria" cobre matches antigos gravados antes desta coluna
+// existir e pares prováveis rejeitados (category === null).
+export const CATEGORY_LABELS: Record<string, string> = {
+  cheque_em_transito: "Cheque em trânsito",
+  deposito_em_transito: "Depósito em trânsito",
+  debito_nao_registado: "Débito ainda não registado",
+  comissao_juro_bancario: "Comissão / juro bancário",
+  erro_transcricao: "Possível erro de transcrição",
+  duplicado: "Possível duplicado",
+  outro: "Outro",
+  outra_sem_categoria: "Sem categoria",
+};
+export const categoryLabel = (c: string | null): string => CATEGORY_LABELS[c ?? "outra_sem_categoria"] ?? CATEGORY_LABELS.outra_sem_categoria;
+
 export interface Tx {
   id: string;
   transaction_date: string;
   description: string;
   amount: number;
+  // referência/n.º de documento tal como lido do extrato, quando existe
+  reference: string | null;
 }
 
 export interface MatchRow {
@@ -49,7 +67,7 @@ export interface DerivedLists {
   acctOnly: UnmatchedRow[];
 }
 
-function uniqueTxs(rows: MatchRow[], side: "bank_transaction" | "accounting_transaction"): Tx[] {
+export function uniqueTxs(rows: MatchRow[], side: "bank_transaction" | "accounting_transaction"): Tx[] {
   const seen = new Set<string>();
   const out: Tx[] = [];
   for (const r of rows) {
@@ -64,7 +82,7 @@ function uniqueTxs(rows: MatchRow[], side: "bank_transaction" | "accounting_tran
 
 // Matches do mesmo grupo um-para-vários partilham group_id; os restantes
 // contam como grupos de uma só linha.
-function groupMatches(rows: MatchRow[]): MatchRow[][] {
+export function groupMatches(rows: MatchRow[]): MatchRow[][] {
   const groups = new Map<string, MatchRow[]>();
   for (const r of rows) {
     const key = r.group_id ?? r.id;
@@ -135,4 +153,30 @@ export function deriveLists(matches: MatchRow[]): DerivedLists {
   }
 
   return { reconciled, probable, bankOnly, acctOnly };
+}
+
+export interface ProbableGroup {
+  matchId: string;
+  groupId: string | null;
+  status: MatchRow["status"];
+  bank: Tx[];
+  accounting: Tx[];
+}
+
+// Todos os pares/grupos prováveis ainda válidos (pendentes ou confirmados; os
+// rejeitados voltam a "Só no Banco"/"Só na Contabilidade" e saem daqui).
+// Serve para o mapa de reconciliação (ficheiro "Pendentes"), que precisa dos
+// grupos confirmados também, ao contrário do separador "Prováveis a confirmar".
+export function probableGroups(matches: MatchRow[]): ProbableGroup[] {
+  const rows = matches.filter((m) => m.match_type === "probable" && m.status !== "rejected");
+  return groupMatches(rows).map((group) => {
+    const first = group[0];
+    return {
+      matchId: first.id,
+      groupId: first.group_id,
+      status: first.status,
+      bank: uniqueTxs(group, "bank_transaction"),
+      accounting: uniqueTxs(group, "accounting_transaction"),
+    };
+  });
 }
