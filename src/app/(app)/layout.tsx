@@ -29,7 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                   <path d="M4 12l5 5L20 6" />
                 </svg>
               </span>
-              <span className="font-display text-[16px] font-extrabold tracking-tight">Match</span>
+              <span className="font-display text-[16px] font-extrabold tracking-tight">100Accounting</span>
             </Link>
             <NavTabs />
           </div>

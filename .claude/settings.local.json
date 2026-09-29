@@ -3,7 +3,9 @@
     "allow": [
       "Bash(git -C \"c:/Users/asus/Desktop/Ricardo/Mota Projects/100Accounting\" status)",
       "Bash(git -C \"c:/Users/asus/Desktop/Ricardo/Mota Projects/100Accounting\" log --oneline -5)",
-      "Bash(git -C \"c:/Users/asus/Desktop/Ricardo/Mota Projects/100Accounting\" status --short)"
+      "Bash(git -C \"c:/Users/asus/Desktop/Ricardo/Mota Projects/100Accounting\" status --short)",
+      "Bash(npm install *)",
+      "Bash(npm run *)"
     ]
   }
 }

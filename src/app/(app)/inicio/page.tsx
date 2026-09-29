@@ -17,12 +17,12 @@ export default function InicioPage() {
           <div className="max-w-xl">
             <Reveal>
               <h1 className="font-display text-4xl font-extrabold uppercase leading-[1.05] tracking-tight sm:text-5xl lg:text-[3.4rem]">
-                O <span className="text-lime-400">Match</span> perfeito para a sua reconciliação bancária.
+                Reconciliação bancária <span className="text-lime-400">automática</span> para o seu negócio.
               </h1>
             </Reveal>
             <Reveal delay={120}>
               <p className="mt-6 text-lg leading-relaxed text-white/70">
-                Carrega o extrato do banco e o extrato da contabilidade em PDF. O Match lê os dois, cruza os movimentos e
+                Carrega o extrato do banco e o extrato da contabilidade em PDF. A 100Accounting lê os dois, cruza os movimentos e
                 devolve-te, em minutos, um relatório claro do que analisou.
               </p>
             </Reveal>
@@ -67,7 +67,7 @@ export default function InicioPage() {
                 n={2}
                 icon={<AiIcon />}
                 title="Cruzamento automático"
-                text="O Match lê ambos os documentos, normaliza os sinais de débito/crédito e cruza os movimentos automaticamente."
+                text="A 100Accounting lê ambos os documentos, normaliza os sinais de débito/crédito e cruza os movimentos automaticamente."
               />
             </Reveal>
             <Reveal delay={240}>
@@ -152,7 +152,7 @@ function DashboardMockup() {
         <span className="h-2.5 w-2.5 rounded-full bg-danger-600/70" />
         <span className="h-2.5 w-2.5 rounded-full bg-amber-glow/80" />
         <span className="h-2.5 w-2.5 rounded-full bg-lime-500/80" />
-        <span className="ml-2 text-[11px] font-bold text-ink-950/60">Match · Dashboard</span>
+        <span className="ml-2 text-[11px] font-bold text-ink-950/60">100Accounting · Dashboard</span>
       </div>
       <div className="rounded-xl bg-ink-950/[0.03] p-4">
         <div className="mb-3 flex items-center justify-between">
