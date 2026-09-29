@@ -26,10 +26,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Link href="/inicio" className="flex items-center gap-2.5">
               <span className="flex h-7 w-7 items-center justify-center rounded-md bg-accent-500">
                 <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                  <path d="M4 12l5 5L20 6" />
+                  <circle cx="9" cy="9" r="2.5"/>
+                  <circle cx="15" cy="15" r="2.5"/>
+                  <line x1="18" y1="6" x2="6" y2="18"/>
                 </svg>
               </span>
-              <span className="font-display text-[16px] font-extrabold tracking-tight">Match</span>
+              <span className="font-display text-[16px] font-extrabold tracking-tight">100% Contas</span>
             </Link>
             <NavTabs />
           </div>
